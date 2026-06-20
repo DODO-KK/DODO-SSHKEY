@@ -2,6 +2,8 @@
 
 Interactive SSH key import and SSH hardening script for DODO K.K.
 
+The setup screen uses the Debian-style `whiptail`/`dialog` interface when available, and falls back to a plain text menu on minimal systems.
+
 ## English
 
 ### Run
@@ -22,7 +24,7 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 
 1. Select language: English or Japanese.
 2. The script detects the system and SSH service.
-3. Select a setup profile from the terminal menu.
+3. Select a setup profile from the package-configuration style menu.
 4. Review the summary and confirm.
 5. Keep the current SSH session open and test a new key login.
 6. If the selected profile changes the SSH port, test `ssh -p 10022`.
@@ -38,6 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 ### Features
 
 - Imports DODO `authorized_keys`.
+- Uses a `whiptail`/`dialog` terminal UI when available.
 - Backs up existing SSH key/config files before changes.
 - Detects Linux, Proxmox VE, and OpenWrt.
 - Supports OpenSSH and OpenWrt Dropbear.
@@ -86,7 +89,7 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 
 1. 言語を選択します: English または 日本語。
 2. スクリプトが OS と SSH サービスを自動検出します。
-3. ターミナル画面で設定方案を選択します。
+3. package configuration 風の画面で設定方案を選択します。
 4. 設定内容を確認して実行します。
 5. 現在の SSH セッションを閉じずに、新しい鍵ログインを確認してください。
 6. SSH ポートを変更した場合は `ssh -p 10022` をテストしてください。
@@ -102,6 +105,7 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 ### 機能
 
 - DODO の `authorized_keys` を導入。
+- 利用可能な場合は `whiptail`/`dialog` のターミナル UI を使用。
 - 変更前に既存の SSH 鍵/設定ファイルをバックアップ。
 - Linux、Proxmox VE、OpenWrt を自動検出。
 - OpenSSH と OpenWrt Dropbear に対応。

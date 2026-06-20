@@ -36,6 +36,7 @@ OS_ID="unknown"
 OS_NAME="unknown"
 PKG_MANAGER=""
 SSH_IMPL="openssh"
+UI_TOOL=""
 
 log() {
     printf '%s\n' "[DODO-SSHKEY] $*"
@@ -56,6 +57,70 @@ have_cmd() {
 
 can_prompt() {
     [ "$DODO_NONINTERACTIVE" != "1" ] && [ -r /dev/tty ] && [ -w /dev/tty ]
+}
+
+detect_ui_tool() {
+    UI_TOOL=""
+    can_prompt || return 0
+
+    if have_cmd whiptail; then
+        UI_TOOL="whiptail"
+    elif have_cmd dialog; then
+        UI_TOOL="dialog"
+    fi
+}
+
+ui_menu() {
+    title="$1"
+    text="$2"
+    height="$3"
+    width="$4"
+    menu_height="$5"
+    shift 5
+
+    if [ "$UI_TOOL" = "whiptail" ]; then
+        whiptail --backtitle "Package configuration" --title "$title" --menu "$text" "$height" "$width" "$menu_height" "$@" 3>&1 1>&2 2>&3 </dev/tty
+    elif [ "$UI_TOOL" = "dialog" ]; then
+        dialog --backtitle "Package configuration" --title "$title" --menu "$text" "$height" "$width" "$menu_height" "$@" 3>&1 1>&2 2>&3 </dev/tty
+    else
+        return 127
+    fi
+}
+
+ui_yesno() {
+    title="$1"
+    text="$2"
+    height="$3"
+    width="$4"
+    default="${5:-1}"
+    default_arg=""
+    [ "$default" = "0" ] && default_arg="--defaultno"
+
+    if [ "$UI_TOOL" = "whiptail" ]; then
+        # shellcheck disable=SC2086
+        whiptail --backtitle "Package configuration" --title "$title" $default_arg --yesno "$text" "$height" "$width" </dev/tty
+    elif [ "$UI_TOOL" = "dialog" ]; then
+        # shellcheck disable=SC2086
+        dialog --backtitle "Package configuration" --title "$title" $default_arg --yesno "$text" "$height" "$width" </dev/tty
+    else
+        return 127
+    fi
+}
+
+ui_inputbox() {
+    title="$1"
+    text="$2"
+    default="$3"
+    height="$4"
+    width="$5"
+
+    if [ "$UI_TOOL" = "whiptail" ]; then
+        whiptail --backtitle "Package configuration" --title "$title" --inputbox "$text" "$height" "$width" "$default" 3>&1 1>&2 2>&3 </dev/tty
+    elif [ "$UI_TOOL" = "dialog" ]; then
+        dialog --backtitle "Package configuration" --title "$title" --inputbox "$text" "$height" "$width" "$default" 3>&1 1>&2 2>&3 </dev/tty
+    else
+        return 127
+    fi
 }
 
 tty_print() {
@@ -127,6 +192,17 @@ select_language() {
         return 0
     fi
 
+    if [ -n "$UI_TOOL" ]; then
+        answer="$(ui_menu "Configuring dodo-sshkey" "Select display language / 表示言語を選択してください。" 13 72 2 \
+            "en" "English" \
+            "ja" "Japanese / 日本語")" || die "Canceled by user."
+        case "$answer" in
+            ja) DODO_LANG="ja" ;;
+            *) DODO_LANG="en" ;;
+        esac
+        return 0
+    fi
+
     tty_print ""
     tty_print "========================================"
     tty_print " DODO-SSHKEY"
@@ -187,7 +263,125 @@ show_summary() {
     fi
 }
 
+summary_text() {
+    fail2ban_summary="$DODO_ENABLE_FAIL2BAN"
+    if [ "$PLATFORM" = "openwrt" ] && [ "$DODO_ENABLE_FAIL2BAN" = "1" ]; then
+        if [ "$DODO_LANG" = "ja" ]; then
+            fail2ban_summary="1 (OpenWrt ではスキップ)"
+        else
+            fail2ban_summary="1 (skipped on OpenWrt)"
+        fi
+    fi
+
+    if [ "$DODO_LANG" = "ja" ]; then
+        cat <<EOF
+以下の設定で実行します。
+
+対象ユーザー: $DODO_USER
+検出システム: $PLATFORM / $OS_NAME / $SSH_IMPL
+パスワードログイン無効化: $DODO_DISABLE_PASSWORD_LOGIN
+SSH ポート 10022 追加: $DODO_CHANGE_SSH_PORT
+旧 SSH ポート 22 維持: $DODO_KEEP_OLD_SSH_PORT
+fail2ban SSH 保護: $fail2ban_summary
+abuse 自動通報: $DODO_ENABLE_ABUSE_REPORTS
+Spamhaus 追加宛先: ${DODO_SPAMHAUS_REPORT_TO:-none}
+TCP forwarding 無効化: $DODO_DISABLE_TCP_FORWARDING
+
+現在の SSH セッションを閉じずに、新しい接続を確認してください。
+EOF
+    else
+        cat <<EOF
+The script will run with this configuration.
+
+Target user: $DODO_USER
+Detected system: $PLATFORM / $OS_NAME / $SSH_IMPL
+Disable password login: $DODO_DISABLE_PASSWORD_LOGIN
+Add SSH port 10022: $DODO_CHANGE_SSH_PORT
+Keep old SSH port 22: $DODO_KEEP_OLD_SSH_PORT
+fail2ban SSH protection: $fail2ban_summary
+Automatic abuse reports: $DODO_ENABLE_ABUSE_REPORTS
+Spamhaus extra destination: ${DODO_SPAMHAUS_REPORT_TO:-none}
+Disable TCP forwarding: $DODO_DISABLE_TCP_FORWARDING
+
+Keep the current SSH session open until a new connection is verified.
+EOF
+    fi
+}
+
 custom_menu() {
+    if [ -n "$UI_TOOL" ]; then
+        if [ "$DODO_LANG" = "ja" ]; then
+            DODO_USER="$(ui_inputbox "Configuring dodo-sshkey" "authorized_keys を設定するユーザーを入力してください。" "$DODO_USER" 9 72)" || die "Canceled by user."
+            if ui_yesno "Configuring dodo-sshkey" "SSH パスワードログインを無効化しますか？" 9 72 "$DODO_DISABLE_PASSWORD_LOGIN"; then
+                DODO_DISABLE_PASSWORD_LOGIN="1"
+            else
+                DODO_DISABLE_PASSWORD_LOGIN="0"
+            fi
+            if ui_yesno "Configuring dodo-sshkey" "SSH ポート 10022 を追加しますか？ 推奨設定ではロックアウト防止のため 22 も維持します。" 11 78 "$DODO_CHANGE_SSH_PORT"; then
+                DODO_CHANGE_SSH_PORT="1"
+                DODO_SSH_PORT="10022"
+                if ui_yesno "Configuring dodo-sshkey" "ロックアウト防止のため旧 SSH ポート 22 も維持しますか？" 9 78 "$DODO_KEEP_OLD_SSH_PORT"; then
+                    DODO_KEEP_OLD_SSH_PORT="1"
+                else
+                    DODO_KEEP_OLD_SSH_PORT="0"
+                fi
+            else
+                DODO_CHANGE_SSH_PORT="0"
+            fi
+            if ui_yesno "Configuring dodo-sshkey" "fail2ban で SSH ブルートフォース対策を有効化しますか？" 9 78 "$DODO_ENABLE_FAIL2BAN"; then
+                DODO_ENABLE_FAIL2BAN="1"
+            else
+                DODO_ENABLE_FAIL2BAN="0"
+            fi
+            if ui_yesno "Configuring dodo-sshkey" "fail2ban ban 時に abuse メールを自動送信しますか？" 9 78 "$DODO_ENABLE_ABUSE_REPORTS"; then
+                DODO_ENABLE_ABUSE_REPORTS="1"
+                DODO_SPAMHAUS_REPORT_TO="$(ui_inputbox "Configuring dodo-sshkey" "Spamhaus など追加レポート宛先を入力してください。空欄でも構いません。" "$DODO_SPAMHAUS_REPORT_TO" 10 78)" || die "Canceled by user."
+            else
+                DODO_ENABLE_ABUSE_REPORTS="0"
+            fi
+            if ui_yesno "Configuring dodo-sshkey" "SSH TCP forwarding も無効化しますか？ 通常のトンネルやポート転送を利用している場合は No を選択してください。" 11 78 "$DODO_DISABLE_TCP_FORWARDING"; then
+                DODO_DISABLE_TCP_FORWARDING="1"
+            else
+                DODO_DISABLE_TCP_FORWARDING="0"
+            fi
+        else
+            DODO_USER="$(ui_inputbox "Configuring dodo-sshkey" "Enter the user for authorized_keys." "$DODO_USER" 9 72)" || die "Canceled by user."
+            if ui_yesno "Configuring dodo-sshkey" "Disable SSH password login?" 9 72 "$DODO_DISABLE_PASSWORD_LOGIN"; then
+                DODO_DISABLE_PASSWORD_LOGIN="1"
+            else
+                DODO_DISABLE_PASSWORD_LOGIN="0"
+            fi
+            if ui_yesno "Configuring dodo-sshkey" "Add SSH port 10022? Recommended mode keeps port 22 as a lockout fallback." 11 78 "$DODO_CHANGE_SSH_PORT"; then
+                DODO_CHANGE_SSH_PORT="1"
+                DODO_SSH_PORT="10022"
+                if ui_yesno "Configuring dodo-sshkey" "Keep old SSH port 22 as a lockout fallback?" 9 78 "$DODO_KEEP_OLD_SSH_PORT"; then
+                    DODO_KEEP_OLD_SSH_PORT="1"
+                else
+                    DODO_KEEP_OLD_SSH_PORT="0"
+                fi
+            else
+                DODO_CHANGE_SSH_PORT="0"
+            fi
+            if ui_yesno "Configuring dodo-sshkey" "Enable fail2ban SSH brute-force protection?" 9 78 "$DODO_ENABLE_FAIL2BAN"; then
+                DODO_ENABLE_FAIL2BAN="1"
+            else
+                DODO_ENABLE_FAIL2BAN="0"
+            fi
+            if ui_yesno "Configuring dodo-sshkey" "Send automatic abuse emails on fail2ban bans?" 9 78 "$DODO_ENABLE_ABUSE_REPORTS"; then
+                DODO_ENABLE_ABUSE_REPORTS="1"
+                DODO_SPAMHAUS_REPORT_TO="$(ui_inputbox "Configuring dodo-sshkey" "Extra report destination such as Spamhaus. Leave empty to skip." "$DODO_SPAMHAUS_REPORT_TO" 10 78)" || die "Canceled by user."
+            else
+                DODO_ENABLE_ABUSE_REPORTS="0"
+            fi
+            if ui_yesno "Configuring dodo-sshkey" "Also disable SSH TCP forwarding? Choose No if you use SSH tunnels or port forwarding." 11 78 "$DODO_DISABLE_TCP_FORWARDING"; then
+                DODO_DISABLE_TCP_FORWARDING="1"
+            else
+                DODO_DISABLE_TCP_FORWARDING="0"
+            fi
+        fi
+        return 0
+    fi
+
     if [ "$DODO_LANG" = "ja" ]; then
         DODO_USER="$(tty_prompt "authorized_keys を設定するユーザー" "$DODO_USER")"
         if prompt_yes_no "SSH パスワードログインを無効化しますか" "$DODO_DISABLE_PASSWORD_LOGIN"; then
@@ -265,7 +459,83 @@ interactive_menu() {
         return 0
     }
 
+    detect_ui_tool
     select_language
+
+    if [ -n "$UI_TOOL" ]; then
+        if [ "$DODO_LANG" = "ja" ]; then
+            menu_text="$(cat <<EOF
+検出: $PLATFORM / $OS_NAME
+SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}
+
+設定方案を選択してください。
+EOF
+)"
+            answer="$(ui_menu "Configuring dodo-sshkey" "$menu_text" 18 86 5 \
+                "recommended" "推奨: SSH鍵導入 + 10022追加（22維持）+ パスワードログイン無効化 + fail2ban" \
+                "strict" "厳格: 推奨 + SSH TCP forwarding 無効化" \
+                "keys" "キーのみ: authorized_keys のみ更新" \
+                "custom" "カスタム: 各項目を手動選択" \
+                "cancel" "中止")" || die "Canceled by user."
+        else
+            menu_text="$(cat <<EOF
+Detected: $PLATFORM / $OS_NAME
+SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}
+
+Select a setup profile.
+EOF
+)"
+            answer="$(ui_menu "Configuring dodo-sshkey" "$menu_text" 18 86 5 \
+                "recommended" "Recommended: keys + 10022 (keep 22) + disable password login + fail2ban" \
+                "strict" "Strict: recommended + disable SSH TCP forwarding" \
+                "keys" "Keys only: update authorized_keys only" \
+                "custom" "Custom: choose each option manually" \
+                "cancel" "Cancel")" || die "Canceled by user."
+        fi
+
+        case "$answer" in
+            recommended)
+                DODO_DISABLE_PASSWORD_LOGIN="1"
+                DODO_CHANGE_SSH_PORT="1"
+                DODO_SSH_PORT="10022"
+                DODO_KEEP_OLD_SSH_PORT="1"
+                DODO_ENABLE_FAIL2BAN="1"
+                DODO_ENABLE_ABUSE_REPORTS="0"
+                DODO_DISABLE_TCP_FORWARDING="0"
+                ;;
+            strict)
+                DODO_DISABLE_PASSWORD_LOGIN="1"
+                DODO_CHANGE_SSH_PORT="1"
+                DODO_SSH_PORT="10022"
+                DODO_KEEP_OLD_SSH_PORT="1"
+                DODO_ENABLE_FAIL2BAN="1"
+                DODO_ENABLE_ABUSE_REPORTS="0"
+                DODO_DISABLE_TCP_FORWARDING="1"
+                ;;
+            keys)
+                DODO_DISABLE_PASSWORD_LOGIN="0"
+                DODO_CHANGE_SSH_PORT="0"
+                DODO_KEEP_OLD_SSH_PORT="1"
+                DODO_ENABLE_FAIL2BAN="0"
+                DODO_ENABLE_ABUSE_REPORTS="0"
+                DODO_DISABLE_TCP_FORWARDING="0"
+                ;;
+            custom)
+                custom_menu
+                ;;
+            cancel)
+                die "Canceled by user."
+                ;;
+        esac
+
+        summary="$(summary_text)"
+        if [ "$DODO_LANG" = "ja" ]; then
+            ui_yesno "Configuring dodo-sshkey" "$summary" 21 86 1 || die "Canceled by user."
+        else
+            ui_yesno "Configuring dodo-sshkey" "$summary" 21 86 1 || die "Canceled by user."
+        fi
+        return 0
+    fi
 
     if [ "$DODO_LANG" = "ja" ]; then
         tty_print ""
