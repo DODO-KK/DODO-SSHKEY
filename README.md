@@ -25,12 +25,12 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 3. Select a setup profile from the terminal menu.
 4. Review the summary and confirm.
 5. Keep the current SSH session open and test a new key login.
-6. If the selected profile changes the SSH port, reconnect with `ssh -p 10022`.
+6. If the selected profile changes the SSH port, test `ssh -p 10022`.
 7. Make sure local firewall, Proxmox firewall, or cloud security groups allow TCP `10022`.
 
 ### Menu Profiles
 
-- Recommended: import keys, change SSH port to `10022`, disable SSH password login, enable fail2ban.
+- Recommended: import keys, add SSH port `10022`, keep port `22` as fallback, disable SSH password login, enable fail2ban.
 - Strict: recommended profile plus disable SSH TCP forwarding.
 - Keys only: update `authorized_keys` only.
 - Custom: choose each option manually.
@@ -41,7 +41,8 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 - Backs up existing SSH key/config files before changes.
 - Detects Linux, Proxmox VE, and OpenWrt.
 - Supports OpenSSH and OpenWrt Dropbear.
-- Changes SSH service port to `10022` when selected.
+- Adds SSH service port `10022` when selected and keeps port `22` by default to avoid lockout.
+- Tries to open TCP `10022` in local UFW/firewalld/iptables where supported.
 - Disables password login for Linux/Proxmox/OpenWrt when selected.
 - Adds OpenSSH hardening options.
 - Configures fail2ban SSH brute-force protection on supported Linux systems.
@@ -62,7 +63,7 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main/import_key.sh | \
-  DODO_NONINTERACTIVE=1 DODO_CHANGE_SSH_PORT=1 DODO_SSH_PORT=10022 DODO_DISABLE_PASSWORD_LOGIN=1 DODO_ENABLE_FAIL2BAN=1 sh
+  DODO_NONINTERACTIVE=1 DODO_CHANGE_SSH_PORT=1 DODO_KEEP_OLD_SSH_PORT=1 DODO_SSH_PORT=10022 DODO_DISABLE_PASSWORD_LOGIN=1 DODO_ENABLE_FAIL2BAN=1 sh
 ```
 
 ## 日本語
@@ -88,12 +89,12 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 3. ターミナル画面で設定方案を選択します。
 4. 設定内容を確認して実行します。
 5. 現在の SSH セッションを閉じずに、新しい鍵ログインを確認してください。
-6. SSH ポートを変更した場合は `ssh -p 10022` で再接続してください。
+6. SSH ポートを変更した場合は `ssh -p 10022` をテストしてください。
 7. ローカル firewall、Proxmox firewall、クラウド security group で TCP `10022` を許可してください。
 
 ### 設定方案
 
-- 推奨: SSH 鍵導入、SSH ポートを `10022` に変更、パスワードログイン無効化、fail2ban 有効化。
+- 推奨: SSH 鍵導入、SSH ポート `10022` を追加、ロックアウト防止のため `22` も維持、パスワードログイン無効化、fail2ban 有効化。
 - 厳格: 推奨設定に加えて SSH TCP forwarding を無効化。
 - キーのみ: `authorized_keys` のみ更新。
 - カスタム: 各項目を手動で選択。
@@ -104,7 +105,8 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 - 変更前に既存の SSH 鍵/設定ファイルをバックアップ。
 - Linux、Proxmox VE、OpenWrt を自動検出。
 - OpenSSH と OpenWrt Dropbear に対応。
-- 選択時に SSH サービスポートを `10022` に変更。
+- 選択時に SSH サービスポート `10022` を追加し、デフォルトではロックアウト防止のため `22` も維持。
+- 対応環境では UFW/firewalld/iptables に TCP `10022` の許可を追加。
 - 選択時に Linux/Proxmox/OpenWrt のパスワードログインを無効化。
 - OpenSSH の基本的なセキュリティ強化設定を追加。
 - 対応 Linux で fail2ban による SSH ブルートフォース対策を設定。
