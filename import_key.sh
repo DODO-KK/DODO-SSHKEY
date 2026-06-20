@@ -12,6 +12,8 @@ set -eu
 #   DODO_ENABLE_ABUSE_REPORTS=0
 #   DODO_SPAMHAUS_REPORT_TO=
 #   DODO_DISABLE_TCP_FORWARDING=0
+#   DODO_CHANGE_SSH_PORT=1
+#   DODO_SSH_PORT=10022
 #   DODO_LANG=en|ja
 #   DODO_NONINTERACTIVE=0|1
 
@@ -22,6 +24,8 @@ DODO_ENABLE_FAIL2BAN="${DODO_ENABLE_FAIL2BAN:-1}"
 DODO_ENABLE_ABUSE_REPORTS="${DODO_ENABLE_ABUSE_REPORTS:-0}"
 DODO_SPAMHAUS_REPORT_TO="${DODO_SPAMHAUS_REPORT_TO:-}"
 DODO_DISABLE_TCP_FORWARDING="${DODO_DISABLE_TCP_FORWARDING:-0}"
+DODO_CHANGE_SSH_PORT="${DODO_CHANGE_SSH_PORT:-1}"
+DODO_SSH_PORT="${DODO_SSH_PORT:-10022}"
 DODO_LANG="${DODO_LANG:-}"
 DODO_NONINTERACTIVE="${DODO_NONINTERACTIVE:-0}"
 
@@ -99,6 +103,20 @@ prompt_yes_no() {
     done
 }
 
+validate_ssh_port() {
+    [ "$DODO_CHANGE_SSH_PORT" = "1" ] || return 0
+
+    case "$DODO_SSH_PORT" in
+        ''|*[!0-9]*)
+            die "Invalid SSH port: $DODO_SSH_PORT"
+            ;;
+    esac
+
+    if [ "$DODO_SSH_PORT" -lt 1 ] || [ "$DODO_SSH_PORT" -gt 65535 ]; then
+        die "Invalid SSH port: $DODO_SSH_PORT"
+    fi
+}
+
 select_language() {
     [ -n "$DODO_LANG" ] && return 0
 
@@ -142,6 +160,7 @@ show_summary() {
         tty_print "対象ユーザー: $DODO_USER"
         tty_print "検出システム: $PLATFORM / $OS_NAME / $SSH_IMPL"
         tty_print "パスワードログイン無効化: $DODO_DISABLE_PASSWORD_LOGIN"
+        tty_print "SSH ポート変更: $DODO_CHANGE_SSH_PORT (${DODO_SSH_PORT})"
         tty_print "fail2ban SSH 保護: $fail2ban_summary"
         tty_print "abuse 自動通報: $DODO_ENABLE_ABUSE_REPORTS"
         tty_print "Spamhaus 追加宛先: ${DODO_SPAMHAUS_REPORT_TO:-none}"
@@ -155,6 +174,7 @@ show_summary() {
         tty_print "Target user: $DODO_USER"
         tty_print "Detected system: $PLATFORM / $OS_NAME / $SSH_IMPL"
         tty_print "Disable password login: $DODO_DISABLE_PASSWORD_LOGIN"
+        tty_print "Change SSH port: $DODO_CHANGE_SSH_PORT (${DODO_SSH_PORT})"
         tty_print "fail2ban SSH protection: $fail2ban_summary"
         tty_print "Automatic abuse reports: $DODO_ENABLE_ABUSE_REPORTS"
         tty_print "Spamhaus extra destination: ${DODO_SPAMHAUS_REPORT_TO:-none}"
@@ -170,6 +190,12 @@ custom_menu() {
             DODO_DISABLE_PASSWORD_LOGIN="1"
         else
             DODO_DISABLE_PASSWORD_LOGIN="0"
+        fi
+        if prompt_yes_no "SSH ポートを 10022 に変更しますか" "$DODO_CHANGE_SSH_PORT"; then
+            DODO_CHANGE_SSH_PORT="1"
+            DODO_SSH_PORT="10022"
+        else
+            DODO_CHANGE_SSH_PORT="0"
         fi
         if prompt_yes_no "fail2ban で SSH ブルートフォース対策を有効化しますか" "$DODO_ENABLE_FAIL2BAN"; then
             DODO_ENABLE_FAIL2BAN="1"
@@ -193,6 +219,12 @@ custom_menu() {
             DODO_DISABLE_PASSWORD_LOGIN="1"
         else
             DODO_DISABLE_PASSWORD_LOGIN="0"
+        fi
+        if prompt_yes_no "Change SSH port to 10022" "$DODO_CHANGE_SSH_PORT"; then
+            DODO_CHANGE_SSH_PORT="1"
+            DODO_SSH_PORT="10022"
+        else
+            DODO_CHANGE_SSH_PORT="0"
         fi
         if prompt_yes_no "Enable fail2ban SSH brute-force protection" "$DODO_ENABLE_FAIL2BAN"; then
             DODO_ENABLE_FAIL2BAN="1"
@@ -228,7 +260,7 @@ interactive_menu() {
         tty_print "========================================"
         tty_print "検出: $PLATFORM / $OS_NAME / SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}"
         tty_print ""
-        tty_print "1) 推奨: SSH鍵導入 + パスワードログイン無効化 + fail2ban"
+        tty_print "1) 推奨: SSH鍵導入 + SSHポート10022 + パスワードログイン無効化 + fail2ban"
         tty_print "2) 厳格: 推奨 + SSH TCP forwarding 無効化"
         tty_print "3) キーのみ: authorized_keys のみ更新"
         tty_print "4) カスタム: 各項目を手動選択"
@@ -240,7 +272,7 @@ interactive_menu() {
         tty_print "========================================"
         tty_print "Detected: $PLATFORM / $OS_NAME / SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}"
         tty_print ""
-        tty_print "1) Recommended: keys + disable password login + fail2ban"
+        tty_print "1) Recommended: keys + SSH port 10022 + disable password login + fail2ban"
         tty_print "2) Strict: recommended + disable SSH TCP forwarding"
         tty_print "3) Keys only: update authorized_keys only"
         tty_print "4) Custom: choose each option"
@@ -257,6 +289,8 @@ interactive_menu() {
         case "$answer" in
             1)
                 DODO_DISABLE_PASSWORD_LOGIN="1"
+                DODO_CHANGE_SSH_PORT="1"
+                DODO_SSH_PORT="10022"
                 DODO_ENABLE_FAIL2BAN="1"
                 DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="0"
@@ -264,6 +298,8 @@ interactive_menu() {
                 ;;
             2)
                 DODO_DISABLE_PASSWORD_LOGIN="1"
+                DODO_CHANGE_SSH_PORT="1"
+                DODO_SSH_PORT="10022"
                 DODO_ENABLE_FAIL2BAN="1"
                 DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="1"
@@ -271,6 +307,7 @@ interactive_menu() {
                 ;;
             3)
                 DODO_DISABLE_PASSWORD_LOGIN="0"
+                DODO_CHANGE_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="0"
@@ -515,6 +552,9 @@ write_openssh_hardening_block() {
     {
         echo "# BEGIN DODO-SSHKEY hardening"
         echo "PubkeyAuthentication yes"
+        if [ "$DODO_CHANGE_SSH_PORT" = "1" ]; then
+            echo "Port $DODO_SSH_PORT"
+        fi
         echo "PermitEmptyPasswords no"
         echo "MaxAuthTries 3"
         echo "MaxSessions 4"
@@ -536,10 +576,11 @@ write_openssh_hardening_block() {
         echo "# END DODO-SSHKEY hardening"
     } >"$block_file"
 
-    awk -v block_file="$block_file" '
+    awk -v block_file="$block_file" -v change_ssh_port="$DODO_CHANGE_SSH_PORT" '
         BEGIN {
             in_block = 0
             inserted = 0
+            in_match = 0
             while ((getline line < block_file) > 0) {
                 block = block line "\n"
             }
@@ -548,9 +589,18 @@ write_openssh_hardening_block() {
         /^[[:space:]]*# BEGIN DODO-SSHKEY hardening/ { in_block = 1; next }
         /^[[:space:]]*# END DODO-SSHKEY hardening/ { in_block = 0; next }
         in_block { next }
-        /^[[:space:]]*Match[[:space:]]/ && inserted == 0 {
-            printf "%s", block
-            inserted = 1
+        /^[[:space:]]*Match[[:space:]]/ {
+            if (inserted == 0) {
+                printf "%s", block
+                inserted = 1
+            }
+            in_match = 1
+            print
+            next
+        }
+        change_ssh_port == "1" && in_match == 0 && /^[[:space:]]*Port[[:space:]]+/ {
+            print "# DODO-SSHKEY disabled old SSH port: " $0
+            next
         }
         { print }
         END {
@@ -576,17 +626,22 @@ write_openssh_hardening_block() {
 configure_openwrt_dropbear() {
     if have_cmd uci; then
         backup_file /etc/config/dropbear
-        uci set dropbear.@dropbear[0].PasswordAuth='off' || true
-        uci set dropbear.@dropbear[0].RootPasswordAuth='off' || true
+        if [ "$DODO_DISABLE_PASSWORD_LOGIN" = "1" ]; then
+            uci set dropbear.@dropbear[0].PasswordAuth='off' || true
+            uci set dropbear.@dropbear[0].RootPasswordAuth='off' || true
+        fi
         uci set dropbear.@dropbear[0].GatewayPorts='off' || true
         uci set dropbear.@dropbear[0].MaxAuthTries='3' || true
+        if [ "$DODO_CHANGE_SSH_PORT" = "1" ]; then
+            uci set dropbear.@dropbear[0].Port="$DODO_SSH_PORT" || true
+        fi
         uci commit dropbear || true
     else
         warn "uci not found; skipping Dropbear UCI hardening."
     fi
 
     restart_service dropbear || warn "Could not restart Dropbear automatically."
-    log "OpenWrt Dropbear password login disabled and auth attempts limited."
+    log "OpenWrt Dropbear hardening applied."
 }
 
 install_fail2ban_packages() {
@@ -761,6 +816,10 @@ configure_fail2ban() {
     }
 
     install -d -m 755 /etc/fail2ban/jail.d
+    fail2ban_ssh_port="ssh"
+    if [ "$DODO_CHANGE_SSH_PORT" = "1" ]; then
+        fail2ban_ssh_port="$DODO_SSH_PORT"
+    fi
 
     action_lines='%(action_)s'
     if [ "$DODO_ENABLE_ABUSE_REPORTS" = "1" ]; then
@@ -776,7 +835,7 @@ EOF
     cat >/etc/fail2ban/jail.d/dodo-sshd.conf <<EOF
 [sshd]
 enabled = true
-port = ssh
+port = $fail2ban_ssh_port
 filter = sshd
 backend = auto
 logpath = %(sshd_log)s
@@ -808,6 +867,7 @@ main() {
     need_root
     detect_platform
     interactive_menu
+    validate_ssh_port
     ensure_fetcher
 
     key_file="$(download_keys)"
@@ -815,12 +875,12 @@ main() {
 
     if [ "$PLATFORM" = "openwrt" ] || [ "$SSH_IMPL" = "dropbear" ]; then
         install_keys_openwrt "$key_file"
-        if [ "$DODO_DISABLE_PASSWORD_LOGIN" = "1" ]; then
+        if [ "$DODO_DISABLE_PASSWORD_LOGIN" = "1" ] || [ "$DODO_CHANGE_SSH_PORT" = "1" ] || [ "$DODO_DISABLE_TCP_FORWARDING" = "1" ]; then
             configure_openwrt_dropbear
         fi
     else
         install_keys_linux "$key_file"
-        if [ "$DODO_DISABLE_PASSWORD_LOGIN" = "1" ]; then
+        if [ "$DODO_DISABLE_PASSWORD_LOGIN" = "1" ] || [ "$DODO_CHANGE_SSH_PORT" = "1" ] || [ "$DODO_DISABLE_TCP_FORWARDING" = "1" ]; then
             write_openssh_hardening_block
         fi
         install_fail2ban_packages
