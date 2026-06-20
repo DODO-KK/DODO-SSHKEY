@@ -12,6 +12,8 @@ set -eu
 #   DODO_ENABLE_ABUSE_REPORTS=0
 #   DODO_SPAMHAUS_REPORT_TO=
 #   DODO_DISABLE_TCP_FORWARDING=0
+#   DODO_LANG=en|ja
+#   DODO_NONINTERACTIVE=0|1
 
 DODO_USER="${DODO_USER:-root}"
 DODO_KEY_URL="${DODO_KEY_URL:-https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main/authorized_keys}"
@@ -20,6 +22,8 @@ DODO_ENABLE_FAIL2BAN="${DODO_ENABLE_FAIL2BAN:-1}"
 DODO_ENABLE_ABUSE_REPORTS="${DODO_ENABLE_ABUSE_REPORTS:-0}"
 DODO_SPAMHAUS_REPORT_TO="${DODO_SPAMHAUS_REPORT_TO:-}"
 DODO_DISABLE_TCP_FORWARDING="${DODO_DISABLE_TCP_FORWARDING:-0}"
+DODO_LANG="${DODO_LANG:-}"
+DODO_NONINTERACTIVE="${DODO_NONINTERACTIVE:-0}"
 
 PLATFORM="linux"
 OS_ID="unknown"
@@ -42,6 +46,255 @@ die() {
 
 have_cmd() {
     command -v "$1" >/dev/null 2>&1
+}
+
+can_prompt() {
+    [ "$DODO_NONINTERACTIVE" != "1" ] && [ -r /dev/tty ] && [ -w /dev/tty ]
+}
+
+tty_print() {
+    printf '%s\n' "$*" >/dev/tty
+}
+
+tty_prompt() {
+    prompt="$1"
+    default="$2"
+    answer=""
+
+    if [ -n "$default" ]; then
+        printf '%s [%s]: ' "$prompt" "$default" >/dev/tty
+    else
+        printf '%s: ' "$prompt" >/dev/tty
+    fi
+
+    IFS= read -r answer </dev/tty || answer=""
+    [ -n "$answer" ] || answer="$default"
+    printf '%s\n' "$answer"
+}
+
+prompt_yes_no() {
+    prompt="$1"
+    default="$2"
+
+    while :; do
+        if [ "$DODO_LANG" = "ja" ]; then
+            if [ "$default" = "1" ]; then
+                answer="$(tty_prompt "$prompt (y/n)" "y")"
+            else
+                answer="$(tty_prompt "$prompt (y/n)" "n")"
+            fi
+        else
+            if [ "$default" = "1" ]; then
+                answer="$(tty_prompt "$prompt (y/n)" "y")"
+            else
+                answer="$(tty_prompt "$prompt (y/n)" "n")"
+            fi
+        fi
+
+        case "$answer" in
+            y|Y|yes|YES|Yes) return 0 ;;
+            n|N|no|NO|No) return 1 ;;
+            *) tty_print "Please enter y or n." ;;
+        esac
+    done
+}
+
+select_language() {
+    [ -n "$DODO_LANG" ] && return 0
+
+    if ! can_prompt; then
+        DODO_LANG="en"
+        return 0
+    fi
+
+    tty_print ""
+    tty_print "========================================"
+    tty_print " DODO-SSHKEY"
+    tty_print "========================================"
+    tty_print "1) English"
+    tty_print "2) Japanese / 日本語"
+
+    while :; do
+        answer="$(tty_prompt "Select language / 言語を選択" "1")"
+        case "$answer" in
+            1|en|EN|English|english) DODO_LANG="en"; return 0 ;;
+            2|ja|JA|Japanese|japanese|日本語) DODO_LANG="ja"; return 0 ;;
+            *) tty_print "Please select 1 or 2." ;;
+        esac
+    done
+}
+
+show_summary() {
+    fail2ban_summary="$DODO_ENABLE_FAIL2BAN"
+    if [ "$PLATFORM" = "openwrt" ] && [ "$DODO_ENABLE_FAIL2BAN" = "1" ]; then
+        if [ "$DODO_LANG" = "ja" ]; then
+            fail2ban_summary="1 (OpenWrt ではスキップ)"
+        else
+            fail2ban_summary="1 (skipped on OpenWrt)"
+        fi
+    fi
+
+    if [ "$DODO_LANG" = "ja" ]; then
+        tty_print ""
+        tty_print "----------------------------------------"
+        tty_print "設定内容"
+        tty_print "----------------------------------------"
+        tty_print "対象ユーザー: $DODO_USER"
+        tty_print "検出システム: $PLATFORM / $OS_NAME / $SSH_IMPL"
+        tty_print "パスワードログイン無効化: $DODO_DISABLE_PASSWORD_LOGIN"
+        tty_print "fail2ban SSH 保護: $fail2ban_summary"
+        tty_print "abuse 自動通報: $DODO_ENABLE_ABUSE_REPORTS"
+        tty_print "Spamhaus 追加宛先: ${DODO_SPAMHAUS_REPORT_TO:-none}"
+        tty_print "TCP forwarding 無効化: $DODO_DISABLE_TCP_FORWARDING"
+        tty_print "----------------------------------------"
+    else
+        tty_print ""
+        tty_print "----------------------------------------"
+        tty_print "Configuration summary"
+        tty_print "----------------------------------------"
+        tty_print "Target user: $DODO_USER"
+        tty_print "Detected system: $PLATFORM / $OS_NAME / $SSH_IMPL"
+        tty_print "Disable password login: $DODO_DISABLE_PASSWORD_LOGIN"
+        tty_print "fail2ban SSH protection: $fail2ban_summary"
+        tty_print "Automatic abuse reports: $DODO_ENABLE_ABUSE_REPORTS"
+        tty_print "Spamhaus extra destination: ${DODO_SPAMHAUS_REPORT_TO:-none}"
+        tty_print "Disable TCP forwarding: $DODO_DISABLE_TCP_FORWARDING"
+        tty_print "----------------------------------------"
+    fi
+}
+
+custom_menu() {
+    if [ "$DODO_LANG" = "ja" ]; then
+        DODO_USER="$(tty_prompt "authorized_keys を設定するユーザー" "$DODO_USER")"
+        if prompt_yes_no "SSH パスワードログインを無効化しますか" "$DODO_DISABLE_PASSWORD_LOGIN"; then
+            DODO_DISABLE_PASSWORD_LOGIN="1"
+        else
+            DODO_DISABLE_PASSWORD_LOGIN="0"
+        fi
+        if prompt_yes_no "fail2ban で SSH ブルートフォース対策を有効化しますか" "$DODO_ENABLE_FAIL2BAN"; then
+            DODO_ENABLE_FAIL2BAN="1"
+        else
+            DODO_ENABLE_FAIL2BAN="0"
+        fi
+        if prompt_yes_no "fail2ban ban 時に abuse メールを自動送信しますか" "$DODO_ENABLE_ABUSE_REPORTS"; then
+            DODO_ENABLE_ABUSE_REPORTS="1"
+            DODO_SPAMHAUS_REPORT_TO="$(tty_prompt "Spamhaus など追加レポート宛先（空欄可）" "$DODO_SPAMHAUS_REPORT_TO")"
+        else
+            DODO_ENABLE_ABUSE_REPORTS="0"
+        fi
+        if prompt_yes_no "SSH TCP forwarding も無効化しますか" "$DODO_DISABLE_TCP_FORWARDING"; then
+            DODO_DISABLE_TCP_FORWARDING="1"
+        else
+            DODO_DISABLE_TCP_FORWARDING="0"
+        fi
+    else
+        DODO_USER="$(tty_prompt "User for authorized_keys" "$DODO_USER")"
+        if prompt_yes_no "Disable SSH password login" "$DODO_DISABLE_PASSWORD_LOGIN"; then
+            DODO_DISABLE_PASSWORD_LOGIN="1"
+        else
+            DODO_DISABLE_PASSWORD_LOGIN="0"
+        fi
+        if prompt_yes_no "Enable fail2ban SSH brute-force protection" "$DODO_ENABLE_FAIL2BAN"; then
+            DODO_ENABLE_FAIL2BAN="1"
+        else
+            DODO_ENABLE_FAIL2BAN="0"
+        fi
+        if prompt_yes_no "Send automatic abuse emails on fail2ban bans" "$DODO_ENABLE_ABUSE_REPORTS"; then
+            DODO_ENABLE_ABUSE_REPORTS="1"
+            DODO_SPAMHAUS_REPORT_TO="$(tty_prompt "Extra report destination such as Spamhaus (optional)" "$DODO_SPAMHAUS_REPORT_TO")"
+        else
+            DODO_ENABLE_ABUSE_REPORTS="0"
+        fi
+        if prompt_yes_no "Also disable SSH TCP forwarding" "$DODO_DISABLE_TCP_FORWARDING"; then
+            DODO_DISABLE_TCP_FORWARDING="1"
+        else
+            DODO_DISABLE_TCP_FORWARDING="0"
+        fi
+    fi
+}
+
+interactive_menu() {
+    can_prompt || {
+        log "No interactive terminal detected; using environment/default settings."
+        return 0
+    }
+
+    select_language
+
+    if [ "$DODO_LANG" = "ja" ]; then
+        tty_print ""
+        tty_print "========================================"
+        tty_print " DODO-SSHKEY セットアップ"
+        tty_print "========================================"
+        tty_print "検出: $PLATFORM / $OS_NAME / SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}"
+        tty_print ""
+        tty_print "1) 推奨: SSH鍵導入 + パスワードログイン無効化 + fail2ban"
+        tty_print "2) 厳格: 推奨 + SSH TCP forwarding 無効化"
+        tty_print "3) キーのみ: authorized_keys のみ更新"
+        tty_print "4) カスタム: 各項目を手動選択"
+        tty_print "5) 中止"
+    else
+        tty_print ""
+        tty_print "========================================"
+        tty_print " DODO-SSHKEY Setup"
+        tty_print "========================================"
+        tty_print "Detected: $PLATFORM / $OS_NAME / SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}"
+        tty_print ""
+        tty_print "1) Recommended: keys + disable password login + fail2ban"
+        tty_print "2) Strict: recommended + disable SSH TCP forwarding"
+        tty_print "3) Keys only: update authorized_keys only"
+        tty_print "4) Custom: choose each option"
+        tty_print "5) Cancel"
+    fi
+
+    while :; do
+        if [ "$DODO_LANG" = "ja" ]; then
+            answer="$(tty_prompt "設定方案を選択" "1")"
+        else
+            answer="$(tty_prompt "Select profile" "1")"
+        fi
+
+        case "$answer" in
+            1)
+                DODO_DISABLE_PASSWORD_LOGIN="1"
+                DODO_ENABLE_FAIL2BAN="1"
+                DODO_ENABLE_ABUSE_REPORTS="0"
+                DODO_DISABLE_TCP_FORWARDING="0"
+                break
+                ;;
+            2)
+                DODO_DISABLE_PASSWORD_LOGIN="1"
+                DODO_ENABLE_FAIL2BAN="1"
+                DODO_ENABLE_ABUSE_REPORTS="0"
+                DODO_DISABLE_TCP_FORWARDING="1"
+                break
+                ;;
+            3)
+                DODO_DISABLE_PASSWORD_LOGIN="0"
+                DODO_ENABLE_FAIL2BAN="0"
+                DODO_ENABLE_ABUSE_REPORTS="0"
+                DODO_DISABLE_TCP_FORWARDING="0"
+                break
+                ;;
+            4)
+                custom_menu
+                break
+                ;;
+            5)
+                die "Canceled by user."
+                ;;
+            *)
+                tty_print "Please select 1-5."
+                ;;
+        esac
+    done
+
+    show_summary
+    if [ "$DODO_LANG" = "ja" ]; then
+        prompt_yes_no "この設定で実行しますか" "1" || die "Canceled by user."
+    else
+        prompt_yes_no "Continue with this configuration" "1" || die "Canceled by user."
+    fi
 }
 
 need_root() {
@@ -554,6 +807,7 @@ EOF
 main() {
     need_root
     detect_platform
+    interactive_menu
     ensure_fetcher
 
     key_file="$(download_keys)"

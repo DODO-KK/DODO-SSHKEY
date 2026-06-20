@@ -1,74 +1,116 @@
-# DODO K.K. SSH Key Import
+# DODO-SSHKEY
 
-Import DODO authorized keys and apply basic SSH hardening for common Linux distributions, Proxmox VE, and OpenWrt.
+Interactive SSH key import and SSH hardening script for DODO K.K.
 
-## Quick Start
+## English
 
-```sh
-curl -o import_key.sh https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main/import_key.sh
-chmod +x import_key.sh
-./import_key.sh
-```
+### Run
 
-Keep the current SSH session open and verify that a new key-based login works before closing the old session.
-
-## What It Does
-
-- Detects common Linux distributions via `/etc/os-release`.
-- Detects Proxmox VE via `pveversion` or `/etc/pve`.
-- Detects OpenWrt/Dropbear via `/etc/openwrt_release` or `/etc/config/dropbear`.
-- Installs `authorized_keys` for `root` by default.
-- Backs up existing `authorized_keys` and SSH config files before replacing or editing them.
-- Disables SSH password login on Linux/Proxmox OpenSSH.
-- Disables Dropbear password login on OpenWrt.
-- Adds OpenSSH hardening settings such as lower auth retry limits, shorter login grace time, verbose auth logging, and disabled X11/agent forwarding.
-- Installs and configures fail2ban for SSH brute-force protection where supported.
-- Optionally configures fail2ban abuse reporting.
-
-## Configuration
-
-Set environment variables before running the script:
+Run as root:
 
 ```sh
-DODO_USER=root \
-DODO_DISABLE_PASSWORD_LOGIN=1 \
-DODO_ENABLE_FAIL2BAN=1 \
-./import_key.sh
+curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main/import_key.sh | sh
 ```
 
-Available variables:
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `DODO_USER` | `root` | Linux user whose `~/.ssh/authorized_keys` is replaced. |
-| `DODO_KEY_URL` | GitHub raw `authorized_keys` | Source URL for keys. |
-| `DODO_DISABLE_PASSWORD_LOGIN` | `1` | Disable password login for OpenSSH/Dropbear. |
-| `DODO_ENABLE_FAIL2BAN` | `1` | Install and configure fail2ban on Linux/Proxmox. |
-| `DODO_ENABLE_ABUSE_REPORTS` | `0` | Enable automatic abuse email reporting from fail2ban bans. |
-| `DODO_SPAMHAUS_REPORT_TO` | empty | Optional additional report destination for Spamhaus-compatible reporting workflows. |
-| `DODO_DISABLE_TCP_FORWARDING` | `0` | Also disable SSH TCP forwarding. This may break legitimate tunnels. |
-
-## Abuse Reporting
-
-Automatic abuse reporting is off by default. To enable it:
+If your system uses `sudo`:
 
 ```sh
-DODO_ENABLE_ABUSE_REPORTS=1 ./import_key.sh
+curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main/import_key.sh | sudo sh
 ```
 
-When enabled, fail2ban calls `/usr/local/sbin/dodo-fail2ban-abuse-report` on SSH bans. The reporter:
+### Flow
 
-- queries WHOIS/RIR data from ARIN, RIPE, APNIC, LACNIC, and AFRINIC;
-- extracts likely abuse/security/NOC contact emails;
-- sends a short SSH brute-force/scanning report if the host has `sendmail`, `mail`, or `mailx`;
-- optionally sends the same report to `DODO_SPAMHAUS_REPORT_TO`.
+1. Select language: English or Japanese.
+2. The script detects the system and SSH service.
+3. Select a setup profile from the terminal menu.
+4. Review the summary and confirm.
+5. Keep the current SSH session open and test a new key login.
 
-Edit `/etc/dodo-sshkey-abuse.conf` after installation to set sender, CC, Spamhaus destination, or dry-run mode.
+### Menu Profiles
 
-Spamhaus reporting is intentionally configurable instead of hard-coded. Use the official reporting address or workflow for your account/process, then place that destination in `DODO_SPAMHAUS_REPORT_TO` or `/etc/dodo-sshkey-abuse.conf`.
+- Recommended: import keys, disable SSH password login, enable fail2ban.
+- Strict: recommended profile plus disable SSH TCP forwarding.
+- Keys only: update `authorized_keys` only.
+- Custom: choose each option manually.
 
-## Notes
+### Features
 
-- OpenWrt uses Dropbear hardening and skips fail2ban by default.
-- RHEL-compatible systems may need EPEL enabled before fail2ban is available.
-- The script validates `sshd_config` with `sshd -t` before restarting OpenSSH. If validation fails, the previous config is restored.
+- Imports DODO `authorized_keys`.
+- Backs up existing SSH key/config files before changes.
+- Detects Linux, Proxmox VE, and OpenWrt.
+- Supports OpenSSH and OpenWrt Dropbear.
+- Disables password login for Linux/Proxmox/OpenWrt when selected.
+- Adds OpenSSH hardening options.
+- Configures fail2ban SSH brute-force protection on supported Linux systems.
+- Optional fail2ban abuse reporting with RIR WHOIS abuse contact lookup.
+- Optional additional Spamhaus-compatible report destination.
+
+### Supported Systems
+
+- Debian / Ubuntu / Proxmox VE
+- RHEL-compatible systems with `dnf` or `yum`
+- openSUSE / SUSE with `zypper`
+- Alpine Linux
+- Arch Linux
+- OpenWrt with Dropbear
+- Other Linux systems with OpenSSH may work if required tools are present.
+
+### Non-Interactive Example
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main/import_key.sh | \
+  DODO_NONINTERACTIVE=1 DODO_DISABLE_PASSWORD_LOGIN=1 DODO_ENABLE_FAIL2BAN=1 sh
+```
+
+## 日本語
+
+### 実行方法
+
+root で実行してください。
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main/import_key.sh | sh
+```
+
+`sudo` を使う環境では:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main/import_key.sh | sudo sh
+```
+
+### 流れ
+
+1. 言語を選択します: English または 日本語。
+2. スクリプトが OS と SSH サービスを自動検出します。
+3. ターミナル画面で設定方案を選択します。
+4. 設定内容を確認して実行します。
+5. 現在の SSH セッションを閉じずに、新しい鍵ログインを確認してください。
+
+### 設定方案
+
+- 推奨: SSH 鍵導入、パスワードログイン無効化、fail2ban 有効化。
+- 厳格: 推奨設定に加えて SSH TCP forwarding を無効化。
+- キーのみ: `authorized_keys` のみ更新。
+- カスタム: 各項目を手動で選択。
+
+### 機能
+
+- DODO の `authorized_keys` を導入。
+- 変更前に既存の SSH 鍵/設定ファイルをバックアップ。
+- Linux、Proxmox VE、OpenWrt を自動検出。
+- OpenSSH と OpenWrt Dropbear に対応。
+- 選択時に Linux/Proxmox/OpenWrt のパスワードログインを無効化。
+- OpenSSH の基本的なセキュリティ強化設定を追加。
+- 対応 Linux で fail2ban による SSH ブルートフォース対策を設定。
+- 任意で RIR WHOIS から abuse 連絡先を検索し、fail2ban ban 時に自動通報。
+- 任意で Spamhaus 互換の追加通報先を設定可能。
+
+### 対応システム
+
+- Debian / Ubuntu / Proxmox VE
+- `dnf` または `yum` を使用する RHEL 系
+- `zypper` を使用する openSUSE / SUSE
+- Alpine Linux
+- Arch Linux
+- Dropbear を使用する OpenWrt
+- 必要ツールがある OpenSSH 搭載 Linux
