@@ -15,7 +15,7 @@ set -eu
 #   DODO_DISABLE_TCP_FORWARDING=0
 #   DODO_CHANGE_SSH_PORT=1
 #   DODO_SSH_PORT=10022
-#   DODO_KEEP_OLD_SSH_PORT=1
+#   DODO_KEEP_OLD_SSH_PORT=0
 #   DODO_CONFIGURE_PVE_FIREWALL=0
 #   DODO_LANG=en|ja
 #   DODO_NONINTERACTIVE=0|1
@@ -30,7 +30,7 @@ DODO_SPAMHAUS_REPORT_TO="${DODO_SPAMHAUS_REPORT_TO:-}"
 DODO_DISABLE_TCP_FORWARDING="${DODO_DISABLE_TCP_FORWARDING:-0}"
 DODO_CHANGE_SSH_PORT="${DODO_CHANGE_SSH_PORT:-1}"
 DODO_SSH_PORT="${DODO_SSH_PORT:-10022}"
-DODO_KEEP_OLD_SSH_PORT="${DODO_KEEP_OLD_SSH_PORT:-1}"
+DODO_KEEP_OLD_SSH_PORT="${DODO_KEEP_OLD_SSH_PORT:-0}"
 DODO_CONFIGURE_PVE_FIREWALL="${DODO_CONFIGURE_PVE_FIREWALL:-0}"
 DODO_LANG="${DODO_LANG:-}"
 DODO_NONINTERACTIVE="${DODO_NONINTERACTIVE:-0}"
@@ -259,7 +259,6 @@ show_summary() {
         tty_print "検出システム: $PLATFORM / $OS_NAME / $SSH_IMPL"
         tty_print "パスワードログイン無効化: $DODO_DISABLE_PASSWORD_LOGIN"
         tty_print "SSH ポート変更: $DODO_CHANGE_SSH_PORT (${DODO_SSH_PORT})"
-        tty_print "旧 SSH ポート維持: $DODO_KEEP_OLD_SSH_PORT"
         if [ "$PLATFORM" = "proxmox" ]; then
             tty_print "Proxmox firewall 推奨設定: $DODO_CONFIGURE_PVE_FIREWALL"
         fi
@@ -278,7 +277,6 @@ show_summary() {
         tty_print "Detected system: $PLATFORM / $OS_NAME / $SSH_IMPL"
         tty_print "Disable password login: $DODO_DISABLE_PASSWORD_LOGIN"
         tty_print "Change SSH port: $DODO_CHANGE_SSH_PORT (${DODO_SSH_PORT})"
-        tty_print "Keep old SSH port: $DODO_KEEP_OLD_SSH_PORT"
         if [ "$PLATFORM" = "proxmox" ]; then
             tty_print "Proxmox firewall recommended setup: $DODO_CONFIGURE_PVE_FIREWALL"
         fi
@@ -317,7 +315,6 @@ SSH 鍵導入: $DODO_INSTALL_KEYS
 検出システム: $PLATFORM / $OS_NAME / $SSH_IMPL
 パスワードログイン無効化: $DODO_DISABLE_PASSWORD_LOGIN
 SSH ポート 10022 追加: $DODO_CHANGE_SSH_PORT
-旧 SSH ポート 22 維持: $DODO_KEEP_OLD_SSH_PORT
 $pve_summary
 fail2ban SSH 保護: $fail2ban_summary
 abuse 自動通報: $DODO_ENABLE_ABUSE_REPORTS
@@ -335,7 +332,6 @@ Import SSH keys: $DODO_INSTALL_KEYS
 Detected system: $PLATFORM / $OS_NAME / $SSH_IMPL
 Disable password login: $DODO_DISABLE_PASSWORD_LOGIN
 Add SSH port 10022: $DODO_CHANGE_SSH_PORT
-Keep old SSH port 22: $DODO_KEEP_OLD_SSH_PORT
 $pve_summary
 fail2ban SSH protection: $fail2ban_summary
 Automatic abuse reports: $DODO_ENABLE_ABUSE_REPORTS
@@ -356,14 +352,10 @@ custom_menu() {
             else
                 DODO_DISABLE_PASSWORD_LOGIN="0"
             fi
-            if ui_yesno "Configuring dodo-sshkey" "SSH ポート 10022 を追加しますか？ 推奨設定ではロックアウト防止のため 22 も維持します。" 11 78 "$DODO_CHANGE_SSH_PORT"; then
+            if ui_yesno "Configuring dodo-sshkey" "SSH ポートを 10022 に変更しますか？" 9 78 "$DODO_CHANGE_SSH_PORT"; then
                 DODO_CHANGE_SSH_PORT="1"
                 DODO_SSH_PORT="10022"
-                if ui_yesno "Configuring dodo-sshkey" "ロックアウト防止のため旧 SSH ポート 22 も維持しますか？" 9 78 "$DODO_KEEP_OLD_SSH_PORT"; then
-                    DODO_KEEP_OLD_SSH_PORT="1"
-                else
-                    DODO_KEEP_OLD_SSH_PORT="0"
-                fi
+                DODO_KEEP_OLD_SSH_PORT="0"
             else
                 DODO_CHANGE_SSH_PORT="0"
             fi
@@ -390,14 +382,10 @@ custom_menu() {
             else
                 DODO_DISABLE_PASSWORD_LOGIN="0"
             fi
-            if ui_yesno "Configuring dodo-sshkey" "Add SSH port 10022? Recommended mode keeps port 22 as a lockout fallback." 11 78 "$DODO_CHANGE_SSH_PORT"; then
+            if ui_yesno "Configuring dodo-sshkey" "Change SSH port to 10022?" 9 78 "$DODO_CHANGE_SSH_PORT"; then
                 DODO_CHANGE_SSH_PORT="1"
                 DODO_SSH_PORT="10022"
-                if ui_yesno "Configuring dodo-sshkey" "Keep old SSH port 22 as a lockout fallback?" 9 78 "$DODO_KEEP_OLD_SSH_PORT"; then
-                    DODO_KEEP_OLD_SSH_PORT="1"
-                else
-                    DODO_KEEP_OLD_SSH_PORT="0"
-                fi
+                DODO_KEEP_OLD_SSH_PORT="0"
             else
                 DODO_CHANGE_SSH_PORT="0"
             fi
@@ -431,11 +419,7 @@ custom_menu() {
         if prompt_yes_no "SSH ポートを 10022 に変更しますか" "$DODO_CHANGE_SSH_PORT"; then
             DODO_CHANGE_SSH_PORT="1"
             DODO_SSH_PORT="10022"
-            if prompt_yes_no "ロックアウト防止のため旧 SSH ポート 22 も維持しますか" "$DODO_KEEP_OLD_SSH_PORT"; then
-                DODO_KEEP_OLD_SSH_PORT="1"
-            else
-                DODO_KEEP_OLD_SSH_PORT="0"
-            fi
+            DODO_KEEP_OLD_SSH_PORT="0"
         else
             DODO_CHANGE_SSH_PORT="0"
         fi
@@ -465,11 +449,7 @@ custom_menu() {
         if prompt_yes_no "Change SSH port to 10022" "$DODO_CHANGE_SSH_PORT"; then
             DODO_CHANGE_SSH_PORT="1"
             DODO_SSH_PORT="10022"
-            if prompt_yes_no "Keep old SSH port 22 as lockout fallback" "$DODO_KEEP_OLD_SSH_PORT"; then
-                DODO_KEEP_OLD_SSH_PORT="1"
-            else
-                DODO_KEEP_OLD_SSH_PORT="0"
-            fi
+            DODO_KEEP_OLD_SSH_PORT="0"
         else
             DODO_CHANGE_SSH_PORT="0"
         fi
@@ -512,7 +492,7 @@ SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}
 EOF
 )"
             answer="$(ui_menu "Configuring dodo-sshkey" "$menu_text" 19 86 6 \
-                "recommended" "推奨: SSH鍵導入 + 10022追加（22維持）+ パスワードログイン無効化 + fail2ban" \
+                "recommended" "推奨: SSH鍵導入 + 10022へ変更+ パスワードログイン無効化 + fail2ban" \
                 "strict" "厳格: 推奨 + SSH TCP forwarding 無効化" \
                 "pvefw" "Proxmox firewall: データセンター rules + PVE 8/9 ノード options" \
                 "keys" "キーのみ: authorized_keys のみ更新" \
@@ -531,7 +511,7 @@ Select a setup profile.
 EOF
 )"
             answer="$(ui_menu "Configuring dodo-sshkey" "$menu_text" 19 86 6 \
-                "recommended" "Recommended: keys + 10022 (keep 22) + disable password login + fail2ban" \
+                "recommended" "Recommended: keys + 10022 + disable password login + fail2ban" \
                 "strict" "Strict: recommended + disable SSH TCP forwarding" \
                 "pvefw" "Proxmox firewall: datacenter rules + PVE 8/9 node options" \
                 "keys" "Keys only: update authorized_keys only" \
@@ -549,7 +529,7 @@ EOF
                 DODO_DISABLE_PASSWORD_LOGIN="1"
                 DODO_CHANGE_SSH_PORT="1"
                 DODO_SSH_PORT="10022"
-                DODO_KEEP_OLD_SSH_PORT="1"
+                DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="1"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
@@ -560,7 +540,7 @@ EOF
                 DODO_DISABLE_PASSWORD_LOGIN="1"
                 DODO_CHANGE_SSH_PORT="1"
                 DODO_SSH_PORT="10022"
-                DODO_KEEP_OLD_SSH_PORT="1"
+                DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="1"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
@@ -578,7 +558,7 @@ EOF
                 DODO_INSTALL_KEYS="0"
                 DODO_DISABLE_PASSWORD_LOGIN="0"
                 DODO_CHANGE_SSH_PORT="0"
-                DODO_KEEP_OLD_SSH_PORT="1"
+                DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="0"
                 DODO_CONFIGURE_PVE_FIREWALL="1"
                 DODO_ENABLE_ABUSE_REPORTS="0"
@@ -588,7 +568,7 @@ EOF
                 DODO_INSTALL_KEYS="1"
                 DODO_DISABLE_PASSWORD_LOGIN="0"
                 DODO_CHANGE_SSH_PORT="0"
-                DODO_KEEP_OLD_SSH_PORT="1"
+                DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="0"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
@@ -632,7 +612,7 @@ EOF
         tty_print "========================================"
         tty_print "Detected: $PLATFORM / $OS_NAME / SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}"
         tty_print ""
-        tty_print "1) Recommended: keys + SSH port 10022 (keep 22) + disable password login + fail2ban"
+        tty_print "1) Recommended: keys + SSH port 10022 + disable password login + fail2ban"
         tty_print "2) Strict: recommended + disable SSH TCP forwarding"
         tty_print "3) Proxmox firewall: datacenter rules + PVE 8/9 node options"
         tty_print "4) Keys only: update authorized_keys only"
@@ -653,7 +633,7 @@ EOF
                 DODO_DISABLE_PASSWORD_LOGIN="1"
                 DODO_CHANGE_SSH_PORT="1"
                 DODO_SSH_PORT="10022"
-                DODO_KEEP_OLD_SSH_PORT="1"
+                DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="1"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
@@ -665,7 +645,7 @@ EOF
                 DODO_DISABLE_PASSWORD_LOGIN="1"
                 DODO_CHANGE_SSH_PORT="1"
                 DODO_SSH_PORT="10022"
-                DODO_KEEP_OLD_SSH_PORT="1"
+                DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="1"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
@@ -680,7 +660,7 @@ EOF
                 DODO_INSTALL_KEYS="0"
                 DODO_DISABLE_PASSWORD_LOGIN="0"
                 DODO_CHANGE_SSH_PORT="0"
-                DODO_KEEP_OLD_SSH_PORT="1"
+                DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="0"
                 DODO_CONFIGURE_PVE_FIREWALL="1"
                 DODO_ENABLE_ABUSE_REPORTS="0"
@@ -691,7 +671,7 @@ EOF
                 DODO_INSTALL_KEYS="1"
                 DODO_DISABLE_PASSWORD_LOGIN="0"
                 DODO_CHANGE_SSH_PORT="0"
-                DODO_KEEP_OLD_SSH_PORT="1"
+                DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="0"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
@@ -940,9 +920,6 @@ write_openssh_hardening_block() {
         echo "# BEGIN DODO-SSHKEY hardening"
         echo "PubkeyAuthentication yes"
         if [ "$DODO_CHANGE_SSH_PORT" = "1" ]; then
-            if [ "$DODO_KEEP_OLD_SSH_PORT" = "1" ]; then
-                echo "Port 22"
-            fi
             echo "Port $DODO_SSH_PORT"
         fi
         echo "PermitEmptyPasswords no"
@@ -1433,8 +1410,22 @@ configure_fail2ban() {
     fail2ban_ssh_port="ssh"
     if [ "$DODO_CHANGE_SSH_PORT" = "1" ]; then
         fail2ban_ssh_port="$DODO_SSH_PORT"
-        if [ "$DODO_KEEP_OLD_SSH_PORT" = "1" ]; then
-            fail2ban_ssh_port="ssh,$DODO_SSH_PORT"
+    fi
+
+    fail2ban_backend="auto"
+    fail2ban_logpath=""
+    if have_cmd journalctl && [ -d /run/systemd/system ]; then
+        fail2ban_backend="systemd"
+    else
+        for candidate in /var/log/auth.log /var/log/secure /var/log/messages; do
+            if [ -f "$candidate" ]; then
+                fail2ban_logpath="$candidate"
+                break
+            fi
+        done
+        if [ -z "$fail2ban_logpath" ]; then
+            warn "No SSH auth log file found; skipping fail2ban sshd jail to avoid service startup failure."
+            return 0
         fi
     fi
 
@@ -1454,13 +1445,22 @@ EOF
 enabled = true
 port = $fail2ban_ssh_port
 filter = sshd
-backend = auto
-logpath = %(sshd_log)s
+backend = $fail2ban_backend
 maxretry = 3
 findtime = 10m
 bantime = 12h
 ignoreip = 127.0.0.1/8 ::1
 action = $action_lines
+EOF
+
+    if [ -n "$fail2ban_logpath" ]; then
+        {
+            echo "logpath = $fail2ban_logpath"
+        } >>/etc/fail2ban/jail.d/dodo-sshd.conf
+    fi
+
+    if [ -f /var/log/fail2ban.log ]; then
+        cat >>/etc/fail2ban/jail.d/dodo-sshd.conf <<EOF
 
 [recidive]
 enabled = true
@@ -1469,6 +1469,7 @@ maxretry = 5
 findtime = 1d
 bantime = 1w
 EOF
+    fi
 
     if have_cmd systemctl && [ -d /run/systemd/system ]; then
         systemctl enable --now fail2ban 2>/dev/null || systemctl restart fail2ban 2>/dev/null || true

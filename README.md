@@ -33,7 +33,7 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 
 ### Menu Profiles
 
-- Recommended: import keys, add SSH port `10022`, keep port `22` as fallback, disable SSH password login, enable fail2ban.
+- Recommended: import keys, change SSH port to `10022`, disable SSH password login, enable fail2ban.
 - Strict: recommended profile plus disable SSH TCP forwarding.
 - Proxmox firewall: configure only Proxmox datacenter firewall rules and PVE 8/9 node options.
 - Keys only: update `authorized_keys` only.
@@ -46,7 +46,7 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 - Backs up existing SSH key/config files before changes.
 - Detects Linux, Proxmox VE, and OpenWrt.
 - Supports OpenSSH and OpenWrt Dropbear.
-- Adds SSH service port `10022` when selected and keeps port `22` by default to avoid lockout.
+- Changes SSH service port to `10022` when selected.
 - Tries to open TCP `10022` in local UFW/firewalld/iptables where supported.
 - On Proxmox VE, configures datacenter firewall options and adds datacenter-level rules for TCP `10022`, Web, and TCP `8006`.
 - On Proxmox VE, configures node firewall options for PVE 8/9 without adding node-level rules.
@@ -98,7 +98,7 @@ No node-level firewall rules are added.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main/import_key.sh | \
-  DODO_NONINTERACTIVE=1 DODO_CHANGE_SSH_PORT=1 DODO_KEEP_OLD_SSH_PORT=1 DODO_SSH_PORT=10022 DODO_DISABLE_PASSWORD_LOGIN=1 DODO_ENABLE_FAIL2BAN=1 sh
+  DODO_NONINTERACTIVE=1 DODO_CHANGE_SSH_PORT=1 DODO_SSH_PORT=10022 DODO_DISABLE_PASSWORD_LOGIN=1 DODO_ENABLE_FAIL2BAN=1 sh
 ```
 
 ## 日本語
@@ -130,7 +130,7 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 
 ### 設定方案
 
-- 推奨: SSH 鍵導入、SSH ポート `10022` を追加、ロックアウト防止のため `22` も維持、パスワードログイン無効化、fail2ban 有効化。
+- 推奨: SSH 鍵導入、SSH ポートを `10022` に変更、パスワードログイン無効化、fail2ban 有効化。
 - 厳格: 推奨設定に加えて SSH TCP forwarding を無効化。
 - Proxmox firewall: Proxmox データセンター firewall rules と PVE 8/9 ノード options のみ設定。
 - キーのみ: `authorized_keys` のみ更新。
@@ -143,7 +143,7 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 - 変更前に既存の SSH 鍵/設定ファイルをバックアップ。
 - Linux、Proxmox VE、OpenWrt を自動検出。
 - OpenSSH と OpenWrt Dropbear に対応。
-- 選択時に SSH サービスポート `10022` を追加し、デフォルトではロックアウト防止のため `22` も維持。
+- 選択時に SSH サービスポートを `10022` に変更。
 - 対応環境では UFW/firewalld/iptables に TCP `10022` の許可を追加。
 - Proxmox VE ではデータセンター firewall の Options を設定し、TCP `10022`、Web、TCP `8006` のデータセンター rules を追加。
 - Proxmox VE では PVE 8/9 向けのノード firewall Options のみ設定し、ノード rules は追加しません。
