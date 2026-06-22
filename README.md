@@ -36,6 +36,8 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 - Recommended: import keys, change SSH port to `10022`, disable SSH password login, enable fail2ban.
 - Strict: recommended profile plus disable SSH TCP forwarding.
 - Proxmox firewall: configure only Proxmox datacenter firewall rules and PVE 8/9 node options.
+- Debian 13 upgrade, Global: switch Debian 12 sources to Debian 13 `trixie` using `deb.debian.org` and run apt upgrade.
+- Debian 13 upgrade, CN: switch Debian 12 sources to Debian 13 `trixie` using Aliyun mirrors and run apt upgrade.
 - Keys only: update `authorized_keys` only.
 - Custom: choose each option manually.
 
@@ -52,9 +54,10 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 - On Proxmox VE, configures node firewall options for PVE 8/9 without adding node-level rules.
 - Disables password login for Linux/Proxmox/OpenWrt when selected.
 - Adds OpenSSH hardening options.
-- Configures fail2ban SSH brute-force protection on supported Linux systems.
+- Configures fail2ban SSH brute-force protection with nftables bans on supported Linux systems.
 - Optional fail2ban abuse reporting with RIR WHOIS abuse contact lookup.
 - Optional additional Spamhaus-compatible report destination.
+- Debian 12 to Debian 13 upgrade option with Global CDN or CN Aliyun APT sources. This option is disabled on Proxmox VE.
 
 ### Proxmox Firewall Profile
 
@@ -101,6 +104,20 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
   DODO_NONINTERACTIVE=1 DODO_CHANGE_SSH_PORT=1 DODO_SSH_PORT=10022 DODO_DISABLE_PASSWORD_LOGIN=1 DODO_ENABLE_FAIL2BAN=1 sh
 ```
 
+Debian 12 to Debian 13 with Global CDN:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main/import_key.sh | \
+  DODO_NONINTERACTIVE=1 DODO_UPGRADE_DEBIAN13=1 DODO_DEBIAN13_MIRROR=global sh
+```
+
+Debian 12 to Debian 13 with Aliyun mirrors:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main/import_key.sh | \
+  DODO_NONINTERACTIVE=1 DODO_UPGRADE_DEBIAN13=1 DODO_DEBIAN13_MIRROR=cn sh
+```
+
 ## 日本語
 
 ### 実行方法
@@ -133,6 +150,8 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 - 推奨: SSH 鍵導入、SSH ポートを `10022` に変更、パスワードログイン無効化、fail2ban 有効化。
 - 厳格: 推奨設定に加えて SSH TCP forwarding を無効化。
 - Proxmox firewall: Proxmox データセンター firewall rules と PVE 8/9 ノード options のみ設定。
+- Debian 13 upgrade, Global: `deb.debian.org` を使用して Debian 12 の APT source を Debian 13 `trixie` に切り替え、apt upgrade を実行。
+- Debian 13 upgrade, CN: Aliyun mirror を使用して Debian 12 の APT source を Debian 13 `trixie` に切り替え、apt upgrade を実行。
 - キーのみ: `authorized_keys` のみ更新。
 - カスタム: 各項目を手動で選択。
 
@@ -149,9 +168,10 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 - Proxmox VE では PVE 8/9 向けのノード firewall Options のみ設定し、ノード rules は追加しません。
 - 選択時に Linux/Proxmox/OpenWrt のパスワードログインを無効化。
 - OpenSSH の基本的なセキュリティ強化設定を追加。
-- 対応 Linux で fail2ban による SSH ブルートフォース対策を設定。
+- 対応 Linux で nftables ban action を使う fail2ban SSH ブルートフォース対策を設定。
 - 任意で RIR WHOIS から abuse 連絡先を検索し、fail2ban ban 時に自動通報。
 - 任意で Spamhaus 互換の追加通報先を設定可能。
+- Debian 12 から Debian 13 への upgrade option。Global CDN または CN Aliyun APT source を選択可能。Proxmox VE では無効です。
 
 ### Proxmox Firewall Profile
 

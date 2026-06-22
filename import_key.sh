@@ -17,6 +17,8 @@ set -eu
 #   DODO_SSH_PORT=10022
 #   DODO_KEEP_OLD_SSH_PORT=0
 #   DODO_CONFIGURE_PVE_FIREWALL=0
+#   DODO_UPGRADE_DEBIAN13=0
+#   DODO_DEBIAN13_MIRROR=global|cn
 #   DODO_LANG=en|ja
 #   DODO_NONINTERACTIVE=0|1
 
@@ -32,6 +34,8 @@ DODO_CHANGE_SSH_PORT="${DODO_CHANGE_SSH_PORT:-1}"
 DODO_SSH_PORT="${DODO_SSH_PORT:-10022}"
 DODO_KEEP_OLD_SSH_PORT="${DODO_KEEP_OLD_SSH_PORT:-0}"
 DODO_CONFIGURE_PVE_FIREWALL="${DODO_CONFIGURE_PVE_FIREWALL:-0}"
+DODO_UPGRADE_DEBIAN13="${DODO_UPGRADE_DEBIAN13:-0}"
+DODO_DEBIAN13_MIRROR="${DODO_DEBIAN13_MIRROR:-global}"
 DODO_LANG="${DODO_LANG:-}"
 DODO_NONINTERACTIVE="${DODO_NONINTERACTIVE:-0}"
 
@@ -262,6 +266,7 @@ show_summary() {
         if [ "$PLATFORM" = "proxmox" ]; then
             tty_print "Proxmox firewall 推奨設定: $DODO_CONFIGURE_PVE_FIREWALL"
         fi
+        tty_print "Debian 13 upgrade: $DODO_UPGRADE_DEBIAN13 (${DODO_DEBIAN13_MIRROR})"
         tty_print "fail2ban SSH 保護: $fail2ban_summary"
         tty_print "abuse 自動通報: $DODO_ENABLE_ABUSE_REPORTS"
         tty_print "Spamhaus 追加宛先: ${DODO_SPAMHAUS_REPORT_TO:-none}"
@@ -280,6 +285,7 @@ show_summary() {
         if [ "$PLATFORM" = "proxmox" ]; then
             tty_print "Proxmox firewall recommended setup: $DODO_CONFIGURE_PVE_FIREWALL"
         fi
+        tty_print "Debian 13 upgrade: $DODO_UPGRADE_DEBIAN13 (${DODO_DEBIAN13_MIRROR})"
         tty_print "fail2ban SSH protection: $fail2ban_summary"
         tty_print "Automatic abuse reports: $DODO_ENABLE_ABUSE_REPORTS"
         tty_print "Spamhaus extra destination: ${DODO_SPAMHAUS_REPORT_TO:-none}"
@@ -314,8 +320,9 @@ summary_text() {
 SSH 鍵導入: $DODO_INSTALL_KEYS
 検出システム: $PLATFORM / $OS_NAME / $SSH_IMPL
 パスワードログイン無効化: $DODO_DISABLE_PASSWORD_LOGIN
-SSH ポート 10022 追加: $DODO_CHANGE_SSH_PORT
+SSH ポート 10022 へ変更: $DODO_CHANGE_SSH_PORT
 $pve_summary
+Debian 13 upgrade: $DODO_UPGRADE_DEBIAN13 (${DODO_DEBIAN13_MIRROR})
 fail2ban SSH 保護: $fail2ban_summary
 abuse 自動通報: $DODO_ENABLE_ABUSE_REPORTS
 Spamhaus 追加宛先: ${DODO_SPAMHAUS_REPORT_TO:-none}
@@ -331,8 +338,9 @@ Target user: $DODO_USER
 Import SSH keys: $DODO_INSTALL_KEYS
 Detected system: $PLATFORM / $OS_NAME / $SSH_IMPL
 Disable password login: $DODO_DISABLE_PASSWORD_LOGIN
-Add SSH port 10022: $DODO_CHANGE_SSH_PORT
+Change SSH port to 10022: $DODO_CHANGE_SSH_PORT
 $pve_summary
+Debian 13 upgrade: $DODO_UPGRADE_DEBIAN13 (${DODO_DEBIAN13_MIRROR})
 fail2ban SSH protection: $fail2ban_summary
 Automatic abuse reports: $DODO_ENABLE_ABUSE_REPORTS
 Spamhaus extra destination: ${DODO_SPAMHAUS_REPORT_TO:-none}
@@ -491,10 +499,12 @@ SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}
 設定方案を選択してください。
 EOF
 )"
-            answer="$(ui_menu "Configuring dodo-sshkey" "$menu_text" 19 86 6 \
-                "recommended" "推奨: SSH鍵導入 + 10022へ変更+ パスワードログイン無効化 + fail2ban" \
+            answer="$(ui_menu "Configuring dodo-sshkey" "$menu_text" 22 92 8 \
+                "recommended" "推奨: SSH鍵導入 + 10022へ変更 + パスワードログイン無効化 + fail2ban" \
                 "strict" "厳格: 推奨 + SSH TCP forwarding 無効化" \
                 "pvefw" "Proxmox firewall: データセンター rules + PVE 8/9 ノード options" \
+                "debian13-global" "Debian 13 upgrade: Global CDN source" \
+                "debian13-cn" "Debian 13 upgrade: CN Aliyun source" \
                 "keys" "キーのみ: authorized_keys のみ更新" \
                 "custom" "カスタム: 各項目を手動選択" \
                 "cancel" "中止")" || {
@@ -510,10 +520,12 @@ SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}
 Select a setup profile.
 EOF
 )"
-            answer="$(ui_menu "Configuring dodo-sshkey" "$menu_text" 19 86 6 \
+            answer="$(ui_menu "Configuring dodo-sshkey" "$menu_text" 22 92 8 \
                 "recommended" "Recommended: keys + 10022 + disable password login + fail2ban" \
                 "strict" "Strict: recommended + disable SSH TCP forwarding" \
                 "pvefw" "Proxmox firewall: datacenter rules + PVE 8/9 node options" \
+                "debian13-global" "Debian 13 upgrade: Global CDN source" \
+                "debian13-cn" "Debian 13 upgrade: CN Aliyun source" \
                 "keys" "Keys only: update authorized_keys only" \
                 "custom" "Custom: choose each option manually" \
                 "cancel" "Cancel")" || {
@@ -532,6 +544,7 @@ EOF
                 DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="1"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
+                DODO_UPGRADE_DEBIAN13="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="0"
                 ;;
@@ -543,6 +556,7 @@ EOF
                 DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="1"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
+                DODO_UPGRADE_DEBIAN13="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="1"
                 ;;
@@ -561,8 +575,24 @@ EOF
                 DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="0"
                 DODO_CONFIGURE_PVE_FIREWALL="1"
+                DODO_UPGRADE_DEBIAN13="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="0"
+                ;;
+            debian13-global|debian13-cn)
+                DODO_INSTALL_KEYS="0"
+                DODO_DISABLE_PASSWORD_LOGIN="0"
+                DODO_CHANGE_SSH_PORT="0"
+                DODO_KEEP_OLD_SSH_PORT="0"
+                DODO_ENABLE_FAIL2BAN="0"
+                DODO_CONFIGURE_PVE_FIREWALL="0"
+                DODO_UPGRADE_DEBIAN13="1"
+                DODO_ENABLE_ABUSE_REPORTS="0"
+                DODO_DISABLE_TCP_FORWARDING="0"
+                case "$answer" in
+                    debian13-cn) DODO_DEBIAN13_MIRROR="cn" ;;
+                    *) DODO_DEBIAN13_MIRROR="global" ;;
+                esac
                 ;;
             keys)
                 DODO_INSTALL_KEYS="1"
@@ -571,12 +601,14 @@ EOF
                 DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="0"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
+                DODO_UPGRADE_DEBIAN13="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="0"
                 ;;
             custom)
                 DODO_INSTALL_KEYS="1"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
+                DODO_UPGRADE_DEBIAN13="0"
                 custom_menu || continue
                 ;;
             cancel)
@@ -599,12 +631,14 @@ EOF
         tty_print "========================================"
         tty_print "検出: $PLATFORM / $OS_NAME / SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}"
         tty_print ""
-        tty_print "1) 推奨: SSH鍵導入 + SSHポート10022（22も維持）+ パスワードログイン無効化 + fail2ban"
+        tty_print "1) 推奨: SSH鍵導入 + SSHポート10022 + パスワードログイン無効化 + fail2ban"
         tty_print "2) 厳格: 推奨 + SSH TCP forwarding 無効化"
         tty_print "3) Proxmox firewall: データセンター rules + PVE 8/9 ノード options"
-        tty_print "4) キーのみ: authorized_keys のみ更新"
-        tty_print "5) カスタム: 各項目を手動選択"
-        tty_print "6) 中止"
+        tty_print "4) Debian 13 upgrade: Global CDN source"
+        tty_print "5) Debian 13 upgrade: CN Aliyun source"
+        tty_print "6) キーのみ: authorized_keys のみ更新"
+        tty_print "7) カスタム: 各項目を手動選択"
+        tty_print "8) 中止"
     else
         tty_print ""
         tty_print "========================================"
@@ -615,9 +649,11 @@ EOF
         tty_print "1) Recommended: keys + SSH port 10022 + disable password login + fail2ban"
         tty_print "2) Strict: recommended + disable SSH TCP forwarding"
         tty_print "3) Proxmox firewall: datacenter rules + PVE 8/9 node options"
-        tty_print "4) Keys only: update authorized_keys only"
-        tty_print "5) Custom: choose each option"
-        tty_print "6) Cancel"
+        tty_print "4) Debian 13 upgrade: Global CDN source"
+        tty_print "5) Debian 13 upgrade: CN Aliyun source"
+        tty_print "6) Keys only: update authorized_keys only"
+        tty_print "7) Custom: choose each option"
+        tty_print "8) Cancel"
     fi
 
     while :; do
@@ -636,6 +672,7 @@ EOF
                 DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="1"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
+                DODO_UPGRADE_DEBIAN13="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="0"
                 break
@@ -648,6 +685,7 @@ EOF
                 DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="1"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
+                DODO_UPGRADE_DEBIAN13="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="1"
                 break
@@ -663,32 +701,61 @@ EOF
                 DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="0"
                 DODO_CONFIGURE_PVE_FIREWALL="1"
+                DODO_UPGRADE_DEBIAN13="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="0"
                 break
                 ;;
             4)
+                DODO_INSTALL_KEYS="0"
+                DODO_DISABLE_PASSWORD_LOGIN="0"
+                DODO_CHANGE_SSH_PORT="0"
+                DODO_KEEP_OLD_SSH_PORT="0"
+                DODO_ENABLE_FAIL2BAN="0"
+                DODO_CONFIGURE_PVE_FIREWALL="0"
+                DODO_UPGRADE_DEBIAN13="1"
+                DODO_DEBIAN13_MIRROR="global"
+                DODO_ENABLE_ABUSE_REPORTS="0"
+                DODO_DISABLE_TCP_FORWARDING="0"
+                break
+                ;;
+            5)
+                DODO_INSTALL_KEYS="0"
+                DODO_DISABLE_PASSWORD_LOGIN="0"
+                DODO_CHANGE_SSH_PORT="0"
+                DODO_KEEP_OLD_SSH_PORT="0"
+                DODO_ENABLE_FAIL2BAN="0"
+                DODO_CONFIGURE_PVE_FIREWALL="0"
+                DODO_UPGRADE_DEBIAN13="1"
+                DODO_DEBIAN13_MIRROR="cn"
+                DODO_ENABLE_ABUSE_REPORTS="0"
+                DODO_DISABLE_TCP_FORWARDING="0"
+                break
+                ;;
+            6)
                 DODO_INSTALL_KEYS="1"
                 DODO_DISABLE_PASSWORD_LOGIN="0"
                 DODO_CHANGE_SSH_PORT="0"
                 DODO_KEEP_OLD_SSH_PORT="0"
                 DODO_ENABLE_FAIL2BAN="0"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
+                DODO_UPGRADE_DEBIAN13="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="0"
                 break
                 ;;
-            5)
+            7)
                 DODO_INSTALL_KEYS="1"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
+                DODO_UPGRADE_DEBIAN13="0"
                 custom_menu
                 break
                 ;;
-            6)
+            8)
                 die "Canceled by user."
                 ;;
             *)
-                tty_print "Please select 1-6."
+                tty_print "Please select 1-8."
                 ;;
         esac
     done
@@ -783,6 +850,95 @@ pkg_install() {
             opkg install "$@" || warn "Some OpenWrt packages were unavailable: $*"
             ;;
     esac
+}
+
+upgrade_debian13() {
+    [ "$DODO_UPGRADE_DEBIAN13" = "1" ] || return 0
+
+    [ "$PLATFORM" != "proxmox" ] || die "Debian 13 upgrade is disabled on Proxmox VE. Use the Proxmox-supported upgrade path instead."
+    [ "$PLATFORM" != "openwrt" ] || die "Debian 13 upgrade is not available on OpenWrt."
+    [ "$OS_ID" = "debian" ] || die "Debian 13 upgrade is only available on Debian systems."
+    [ "$PKG_MANAGER" = "apt" ] || die "Debian 13 upgrade requires apt."
+
+    version_id=""
+    if [ -r /etc/os-release ]; then
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        version_id="${VERSION_ID:-}"
+    fi
+
+    case "$version_id" in
+        13)
+            log "System is already Debian 13; running package refresh only."
+            ;;
+        12)
+            log "Preparing Debian 12 -> Debian 13 upgrade."
+            ;;
+        *)
+            die "Only Debian 12 -> Debian 13 upgrade is supported by this script. Detected VERSION_ID=${version_id:-unknown}."
+            ;;
+    esac
+
+    case "$DODO_DEBIAN13_MIRROR" in
+        cn)
+            debian_uri="https://mirrors.aliyun.com/debian"
+            security_uri="https://mirrors.aliyun.com/debian-security"
+            ;;
+        global|"")
+            debian_uri="https://deb.debian.org/debian"
+            security_uri="https://security.debian.org/debian-security"
+            ;;
+        *)
+            die "Invalid DODO_DEBIAN13_MIRROR: $DODO_DEBIAN13_MIRROR"
+            ;;
+    esac
+
+    export DEBIAN_FRONTEND=noninteractive
+    log "Installing Debian archive keyring and HTTPS certificates before source switch."
+    apt-get update || warn "apt-get update failed before source switch; continuing with source rewrite."
+    apt-get install -y debian-archive-keyring ca-certificates || warn "Failed to refresh keyring/certificates before source switch."
+
+    backup_dir="/root/dodo-sshkey-apt-backup-$(date +%Y%m%d%H%M%S)"
+    install -d -m 700 "$backup_dir/sources.list.d"
+    [ ! -f /etc/apt/sources.list ] || cp -a /etc/apt/sources.list "$backup_dir/sources.list"
+    if [ -d /etc/apt/sources.list.d ]; then
+        cp -a /etc/apt/sources.list.d/. "$backup_dir/sources.list.d/" 2>/dev/null || true
+    else
+        install -d -m 755 /etc/apt/sources.list.d
+    fi
+
+    if [ -f /etc/apt/sources.list ]; then
+        : >/etc/apt/sources.list
+    fi
+
+    for file in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+        [ -f "$file" ] || continue
+        case "$file" in
+            *.dodo-disabled) continue ;;
+            *) mv "$file" "$file.dodo-disabled" ;;
+        esac
+    done
+
+    cat >/etc/apt/sources.list.d/dodo-debian13.sources <<EOF
+Types: deb
+URIs: $debian_uri
+Suites: trixie trixie-updates
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: $security_uri
+Suites: trixie-security
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+EOF
+
+    log "APT sources switched to Debian 13 trixie ($DODO_DEBIAN13_MIRROR). Backup: $backup_dir"
+    apt-get update
+    apt-get -y upgrade
+    apt-get -y dist-upgrade
+    apt-get -y autoremove
+    log "Debian 13 upgrade flow completed. Reboot the server and verify /etc/os-release."
 }
 
 ensure_fetcher() {
@@ -1243,18 +1399,18 @@ install_fail2ban_packages() {
         return 0
     fi
 
-    if have_cmd fail2ban-client; then
+    if have_cmd fail2ban-client && have_cmd nft; then
         return 0
     fi
 
-    log "Installing fail2ban..."
+    log "Installing fail2ban/nftables..."
     case "$PKG_MANAGER" in
-        apt) pkg_install fail2ban whois ca-certificates || warn "Failed to install fail2ban packages." ;;
-        dnf|yum) pkg_install fail2ban whois bind-utils ca-certificates || warn "Failed to install fail2ban packages. On RHEL-compatible systems, EPEL may be required." ;;
-        zypper) pkg_install fail2ban whois ca-certificates || warn "Failed to install fail2ban packages." ;;
-        apk) pkg_install fail2ban whois ca-certificates || warn "Failed to install fail2ban packages." ;;
-        pacman) pkg_install fail2ban whois ca-certificates || warn "Failed to install fail2ban packages." ;;
-        *) pkg_install fail2ban whois || warn "Failed to install fail2ban packages." ;;
+        apt) pkg_install fail2ban nftables whois ca-certificates || warn "Failed to install fail2ban/nftables packages." ;;
+        dnf|yum) pkg_install fail2ban nftables whois bind-utils ca-certificates || warn "Failed to install fail2ban/nftables packages. On RHEL-compatible systems, EPEL may be required." ;;
+        zypper) pkg_install fail2ban nftables whois ca-certificates || warn "Failed to install fail2ban/nftables packages." ;;
+        apk) pkg_install fail2ban nftables whois ca-certificates || warn "Failed to install fail2ban/nftables packages." ;;
+        pacman) pkg_install fail2ban nftables whois ca-certificates || warn "Failed to install fail2ban/nftables packages." ;;
+        *) pkg_install fail2ban nftables whois || warn "Failed to install fail2ban/nftables packages." ;;
     esac
 }
 
@@ -1405,6 +1561,7 @@ configure_fail2ban() {
         warn "fail2ban is not installed; skipping jail config."
         return 0
     }
+    have_cmd nft || warn "nft command was not found; fail2ban nftables action may not be able to enforce bans until nftables is installed."
 
     install -d -m 755 /etc/fail2ban/jail.d
     fail2ban_ssh_port="ssh"
@@ -1450,6 +1607,8 @@ maxretry = 3
 findtime = 10m
 bantime = 12h
 ignoreip = 127.0.0.1/8 ::1
+banaction = nftables-multiport
+banaction_allports = nftables-allports
 action = $action_lines
 EOF
 
@@ -1486,6 +1645,11 @@ main() {
     detect_platform
     interactive_menu
     validate_ssh_port
+
+    if [ "$DODO_UPGRADE_DEBIAN13" = "1" ]; then
+        upgrade_debian13
+        return 0
+    fi
 
     key_file=""
     if [ "$DODO_INSTALL_KEYS" = "1" ]; then
