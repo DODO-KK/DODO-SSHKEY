@@ -12,7 +12,7 @@ set -eu
 #   DODO_ENABLE_FAIL2BAN=1
 #   DODO_ENABLE_ABUSE_REPORTS=0
 #   DODO_SPAMHAUS_REPORT_TO=
-#   DODO_DISABLE_TCP_FORWARDING=0
+#   DODO_DISABLE_TCP_FORWARDING=1
 #   DODO_CHANGE_SSH_PORT=1
 #   DODO_SSH_PORT=10022
 #   DODO_KEEP_OLD_SSH_PORT=0
@@ -29,7 +29,7 @@ DODO_DISABLE_PASSWORD_LOGIN="${DODO_DISABLE_PASSWORD_LOGIN:-1}"
 DODO_ENABLE_FAIL2BAN="${DODO_ENABLE_FAIL2BAN:-1}"
 DODO_ENABLE_ABUSE_REPORTS="${DODO_ENABLE_ABUSE_REPORTS:-0}"
 DODO_SPAMHAUS_REPORT_TO="${DODO_SPAMHAUS_REPORT_TO:-}"
-DODO_DISABLE_TCP_FORWARDING="${DODO_DISABLE_TCP_FORWARDING:-0}"
+DODO_DISABLE_TCP_FORWARDING="${DODO_DISABLE_TCP_FORWARDING:-1}"
 DODO_CHANGE_SSH_PORT="${DODO_CHANGE_SSH_PORT:-1}"
 DODO_SSH_PORT="${DODO_SSH_PORT:-10022}"
 DODO_KEEP_OLD_SSH_PORT="${DODO_KEEP_OLD_SSH_PORT:-0}"
@@ -46,6 +46,7 @@ OS_VERSION_ID=""
 PKG_MANAGER=""
 SSH_IMPL="openssh"
 UI_TOOL=""
+UI_UTF8="0"
 
 log() {
     printf '%s\n' "[DODO-SSHKEY] $*"
@@ -77,6 +78,37 @@ detect_ui_tool() {
     elif have_cmd dialog; then
         UI_TOOL="dialog"
     fi
+}
+
+locale_is_utf8() {
+    charmap="$(locale charmap 2>/dev/null || true)"
+    case "$charmap" in
+        *UTF-8*|*utf8*|*UTF8*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+enable_utf8_locale() {
+    UI_UTF8="0"
+    [ "$DODO_LANG" = "zh" ] || [ "$DODO_LANG" = "ja" ] || return 0
+
+    if locale_is_utf8; then
+        UI_UTF8="1"
+        return 0
+    fi
+
+    for loc in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
+        if locale -a 2>/dev/null | grep -qx "$loc"; then
+            export LANG="$loc"
+            export LC_ALL="$loc"
+            UI_UTF8="1"
+            return 0
+        fi
+    done
+
+    DODO_LANG="en"
+    UI_UTF8="0"
+    warn "UTF-8 locale is not available; falling back to English terminal UI."
 }
 
 ui_menu() {
@@ -226,6 +258,7 @@ select_language() {
             ja) DODO_LANG="ja" ;;
             *) DODO_LANG="en" ;;
         esac
+        enable_utf8_locale
         return 0
     fi
 
@@ -241,8 +274,8 @@ select_language() {
         answer="$(tty_prompt "Select language" "1")"
         case "$answer" in
             1|en|EN|English|english) DODO_LANG="en"; return 0 ;;
-            2|ja|JA|Japanese|japanese) DODO_LANG="ja"; return 0 ;;
-            3|zh|ZH|Chinese|chinese|cn|CN) DODO_LANG="zh"; return 0 ;;
+            2|ja|JA|Japanese|japanese) DODO_LANG="ja"; enable_utf8_locale; return 0 ;;
+            3|zh|ZH|Chinese|chinese|cn|CN) DODO_LANG="zh"; enable_utf8_locale; return 0 ;;
             *) tty_print "Please select 1, 2, or 3." ;;
         esac
     done
@@ -342,7 +375,7 @@ summary_text() {
         fi
     fi
 
-    if [ -n "$UI_TOOL" ]; then
+    if [ -n "$UI_TOOL" ] && [ "$UI_UTF8" != "1" ]; then
         if [ "$PLATFORM" = "proxmox" ]; then
             pve_summary="Proxmox firewall setup: $DODO_CONFIGURE_PVE_FIREWALL"
         fi
@@ -710,6 +743,113 @@ select_debian13_mirror() {
     done
 }
 
+confirm_pve_firewall_profile() {
+    if [ "$DODO_LANG" = "zh" ] && [ "$UI_UTF8" = "1" ]; then
+        message="$(cat <<EOF
+将只配置 Proxmox VE 防火墙。
+
+不会导入 SSH key。
+不会修改 SSH 端口。
+不会修改 SSH 密码登录。
+
+数据中心 Options:
+- Firewall: enabled
+- ebtables: enabled
+- Log rate limit: enable=1,rate=1/second,burst=5
+- Input policy: DROP
+- Output policy: ACCEPT
+- Forward policy: ACCEPT
+
+数据中心 Rules:
+- Allow TCP 10022
+- Allow Web
+- Allow TCP 8006
+
+节点 Options:
+- Firewall: enabled
+- SMURFS filter: enabled
+- TCP flags filter: disabled
+- NDP: enabled
+- nftables technical preview: disabled
+- Log levels: nolog
+
+不会添加节点级别 firewall rules。
+EOF
+)"
+    elif [ "$DODO_LANG" = "ja" ] && [ "$UI_UTF8" = "1" ]; then
+        message="$(cat <<EOF
+Proxmox VE firewall のみ設定します。
+
+SSH key は導入しません。
+SSH port は変更しません。
+SSH password login は変更しません。
+
+Datacenter Options:
+- Firewall: enabled
+- ebtables: enabled
+- Log rate limit: enable=1,rate=1/second,burst=5
+- Input policy: DROP
+- Output policy: ACCEPT
+- Forward policy: ACCEPT
+
+Datacenter Rules:
+- Allow TCP 10022
+- Allow Web
+- Allow TCP 8006
+
+Node Options:
+- Firewall: enabled
+- SMURFS filter: enabled
+- TCP flags filter: disabled
+- NDP: enabled
+- nftables technical preview: disabled
+- Log levels: nolog
+
+Node-level firewall rules は追加しません。
+EOF
+)"
+    else
+        message="$(cat <<EOF
+This will configure Proxmox VE firewall only.
+
+It will not import SSH keys.
+It will not change SSH port.
+It will not change SSH password login.
+
+Datacenter options:
+- Firewall: enabled
+- ebtables: enabled
+- Log rate limit: enable=1,rate=1/second,burst=5
+- Input policy: DROP
+- Output policy: ACCEPT
+- Forward policy: ACCEPT
+
+Datacenter rules:
+- Allow TCP 10022
+- Allow Web
+- Allow TCP 8006
+
+Node options:
+- Firewall: enabled
+- SMURFS filter: enabled
+- TCP flags filter: disabled
+- NDP: enabled
+- nftables technical preview: disabled
+- Log levels: nolog
+
+No node-level firewall rules will be added.
+EOF
+)"
+    fi
+
+    if [ -n "$UI_TOOL" ]; then
+        ui_yesno "Configuring dodo-sshkey" "$message" 31 92 0
+    else
+        tty_print "$message"
+        prompt_yes_no "Continue with PVE firewall import" "0"
+    fi
+}
+
 interactive_menu() {
     can_prompt || {
         log "No interactive terminal detected; using environment/default settings."
@@ -721,6 +861,45 @@ interactive_menu() {
 
     if [ -n "$UI_TOOL" ]; then
         while :; do
+        if [ "$DODO_LANG" = "zh" ] && [ "$UI_UTF8" = "1" ]; then
+            menu_text="$(cat <<EOF
+检测: $PLATFORM / $OS_NAME
+SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}
+
+请选择要执行的配置。
+EOF
+)"
+            answer="$(ui_menu "Configuring dodo-sshkey" "$menu_text" 22 100 6 \
+                "推荐配置" "SSH 10022 + key 登录 + 关闭密码登录 + fail2ban 黑名单 + 关闭隧道" \
+                "导入PVE防火墙" "导入 Proxmox VE 防火墙规则和 Options" \
+                "升级Debian13" "Debian 11/12 升级到 13，下一步选择 Global 或 CN 源" \
+                "Key和端口" "导入 authorized_keys + SSH 10022 + 关闭密码登录" \
+                "自定义设置" "手动选择 SSH/fail2ban/PVE 项目" \
+                "取消" "不做修改并退出")" || {
+                    DODO_LANG=""
+                    select_language
+                    continue
+                }
+        elif [ "$DODO_LANG" = "ja" ] && [ "$UI_UTF8" = "1" ]; then
+            menu_text="$(cat <<EOF
+検出: $PLATFORM / $OS_NAME
+SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}
+
+実行する設定を選択してください。
+EOF
+)"
+            answer="$(ui_menu "Configuring dodo-sshkey" "$menu_text" 22 100 6 \
+                "推奨設定" "SSH 10022 + key login + password login off + fail2ban blacklist + tunnel off" \
+                "PVE-FW導入" "Proxmox VE firewall rules/options を導入" \
+                "Debian13更新" "Debian 11/12 を 13 へ更新。次画面で Global / CN source を選択" \
+                "KeyとPort" "authorized_keys 導入 + SSH 10022 + password login off" \
+                "カスタム設定" "SSH/fail2ban/PVE 項目を手動選択" \
+                "中止" "変更せず終了")" || {
+                    DODO_LANG=""
+                    select_language
+                    continue
+                }
+        else
             menu_text="$(cat <<EOF
 Detected: $PLATFORM / $OS_NAME
 SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}
@@ -728,34 +907,21 @@ SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}
 Select the change to apply.
 EOF
 )"
-            answer="$(ui_menu "Configuring dodo-sshkey" "$menu_text" 22 100 7 \
-                "ssh-10022-fail2ban" "keys, disable password login, add fail2ban blacklist" \
-                "strict-no-forward" "ssh-10022-fail2ban plus disable SSH tunnels/port forwards" \
-                "pve-firewall" "configure Proxmox firewall only; no SSH/key changes" \
+            answer="$(ui_menu "Configuring dodo-sshkey" "$menu_text" 22 100 6 \
+                "recommended" "SSH 10022, key login, password off, fail2ban blacklist, tunnels off" \
+                "import-pve-fw" "import Proxmox VE firewall rules and options" \
                 "debian13-upgrade" "upgrade Debian 11/12 to 13; choose Global or CN source next" \
-                "keys-ssh10022" "install authorized_keys and change SSH port to 10022" \
-                "custom-options" "choose each SSH/fail2ban option manually" \
+                "key-and-port" "install authorized_keys, SSH 10022, password login off" \
+                "custom-setup" "choose SSH/fail2ban/PVE options manually" \
                 "cancel" "exit without changes")" || {
                     DODO_LANG=""
                     select_language
                     continue
                 }
+        fi
 
         case "$answer" in
-            recommended|ssh-10022-fail2ban)
-                recommended_firewall_precheck || continue
-                DODO_INSTALL_KEYS="1"
-                DODO_DISABLE_PASSWORD_LOGIN="1"
-                DODO_CHANGE_SSH_PORT="1"
-                DODO_SSH_PORT="10022"
-                DODO_KEEP_OLD_SSH_PORT="0"
-                DODO_ENABLE_FAIL2BAN="1"
-                DODO_CONFIGURE_PVE_FIREWALL="0"
-                DODO_UPGRADE_DEBIAN13="0"
-                DODO_ENABLE_ABUSE_REPORTS="0"
-                DODO_DISABLE_TCP_FORWARDING="0"
-                ;;
-            strict|strict-no-forward)
+            recommended|ssh-10022-fail2ban|推荐配置|推奨設定)
                 recommended_firewall_precheck || continue
                 DODO_INSTALL_KEYS="1"
                 DODO_DISABLE_PASSWORD_LOGIN="1"
@@ -768,11 +934,12 @@ EOF
                 DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="1"
                 ;;
-            pvefw|pve-firewall)
+            pvefw|pve-firewall|import-pve-fw|导入PVE防火墙|PVE-FW導入)
                 if [ "$PLATFORM" != "proxmox" ]; then
                     ui_msgbox "Configuring dodo-sshkey" "This feature is only available on Proxmox VE. Returning to the main menu." 9 78 || true
                     continue
                 fi
+                confirm_pve_firewall_profile || continue
                 DODO_INSTALL_KEYS="0"
                 DODO_DISABLE_PASSWORD_LOGIN="0"
                 DODO_CHANGE_SSH_PORT="0"
@@ -783,7 +950,7 @@ EOF
                 DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="0"
                 ;;
-            debian13|debian13-upgrade)
+            debian13|debian13-upgrade|升级Debian13|Debian13更新)
                 select_debian13_mirror || continue
                 DODO_INSTALL_KEYS="0"
                 DODO_DISABLE_PASSWORD_LOGIN="0"
@@ -795,9 +962,9 @@ EOF
                 DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="0"
                 ;;
-            keys|keys-ssh10022)
+            keys|keys-ssh10022|key-and-port|Key和端口|KeyとPort)
                 DODO_INSTALL_KEYS="1"
-                DODO_DISABLE_PASSWORD_LOGIN="0"
+                DODO_DISABLE_PASSWORD_LOGIN="1"
                 DODO_CHANGE_SSH_PORT="1"
                 DODO_SSH_PORT="10022"
                 DODO_KEEP_OLD_SSH_PORT="0"
@@ -807,13 +974,13 @@ EOF
                 DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="0"
                 ;;
-            custom|custom-options)
+            custom|custom-options|custom-setup|自定义设置|カスタム設定)
                 DODO_INSTALL_KEYS="1"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
                 DODO_UPGRADE_DEBIAN13="0"
                 custom_menu || continue
                 ;;
-            cancel)
+            cancel|取消|中止)
                 DODO_LANG=""
                 select_language
                 continue
@@ -833,13 +1000,12 @@ EOF
         tty_print "========================================"
         tty_print "检测: $PLATFORM / $OS_NAME / SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}"
         tty_print ""
-        tty_print "1) 推荐: 导入 key + SSH 10022 + 关闭密码登录 + fail2ban"
-        tty_print "2) 严格: 推荐配置 + 关闭 SSH TCP forwarding（会影响隧道/端口转发）"
-        tty_print "3) Proxmox firewall: 只配置 PVE 防火墙，不导入 key，不改 SSH"
-        tty_print "4) Debian 13 upgrade: 进入后选择 Global CDN 或 CN Aliyun 源"
-        tty_print "5) Keys + port: 导入 authorized_keys 并把 SSH 改为 10022"
-        tty_print "6) 自定义: 手动选择每个项目"
-        tty_print "7) 取消"
+        tty_print "1) 推荐配置: SSH 10022 + key 登录 + 关闭密码登录 + fail2ban 黑名单 + 关闭隧道"
+        tty_print "2) 导入 PVE 防火墙规则"
+        tty_print "3) Debian 13 upgrade: 进入后选择 Global CDN 或 CN Aliyun 源"
+        tty_print "4) Key only and Port Change: 导入 key + SSH 10022 + 关闭密码登录"
+        tty_print "5) Custom 设置"
+        tty_print "6) 取消"
     elif [ "$DODO_LANG" = "ja" ]; then
         tty_print ""
         tty_print "========================================"
@@ -847,13 +1013,12 @@ EOF
         tty_print "========================================"
         tty_print "検出: $PLATFORM / $OS_NAME / SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}"
         tty_print ""
-        tty_print "1) 推奨: SSH鍵導入 + SSHポート10022 + パスワードログイン無効化 + fail2ban"
-        tty_print "2) 厳格: 推奨 + SSH TCP forwarding 無効化（tunnel/port forward に影響）"
-        tty_print "3) Proxmox firewall: PVE firewall のみ設定。鍵導入/SSH変更なし"
-        tty_print "4) Debian 13 upgrade: 次画面で Global CDN / CN Aliyun を選択"
-        tty_print "5) Keys + port: authorized_keys 導入 + SSH を 10022 へ変更"
-        tty_print "6) カスタム: 各項目を手動選択"
-        tty_print "7) 中止"
+        tty_print "1) 推奨設定: SSH 10022 + key login + password login off + fail2ban blacklist + tunnel off"
+        tty_print "2) PVE firewall rules を導入"
+        tty_print "3) Debian 13 upgrade: 次画面で Global CDN / CN Aliyun を選択"
+        tty_print "4) Key only and Port Change: key 導入 + SSH 10022 + password login off"
+        tty_print "5) Custom 設定"
+        tty_print "6) 中止"
     else
         tty_print ""
         tty_print "========================================"
@@ -861,13 +1026,12 @@ EOF
         tty_print "========================================"
         tty_print "Detected: $PLATFORM / $OS_NAME / SSH: $SSH_IMPL / PKG: ${PKG_MANAGER:-none}"
         tty_print ""
-        tty_print "1) Recommended: keys + SSH port 10022 + disable password login + fail2ban"
-        tty_print "2) Strict: recommended + disable SSH TCP forwarding (breaks tunnels/port forwards)"
-        tty_print "3) Proxmox firewall: PVE firewall only; no key import or SSH changes"
-        tty_print "4) Debian 13 upgrade: choose Global CDN or CN Aliyun in the next screen"
-        tty_print "5) Keys + port: install authorized_keys and change SSH to 10022"
-        tty_print "6) Custom: choose each option"
-        tty_print "7) Cancel"
+        tty_print "1) Recommended: SSH 10022 + key login + password off + fail2ban blacklist + tunnels off"
+        tty_print "2) Import PVE firewall rules"
+        tty_print "3) Debian 13 upgrade: choose Global CDN or CN Aliyun in the next screen"
+        tty_print "4) Key only and Port Change: keys + SSH 10022 + password login off"
+        tty_print "5) Custom setup"
+        tty_print "6) Cancel"
     fi
 
     while :; do
@@ -891,24 +1055,10 @@ EOF
                 DODO_CONFIGURE_PVE_FIREWALL="0"
                 DODO_UPGRADE_DEBIAN13="0"
                 DODO_ENABLE_ABUSE_REPORTS="0"
-                DODO_DISABLE_TCP_FORWARDING="0"
-                break
-                ;;
-            2)
-                recommended_firewall_precheck || continue
-                DODO_INSTALL_KEYS="1"
-                DODO_DISABLE_PASSWORD_LOGIN="1"
-                DODO_CHANGE_SSH_PORT="1"
-                DODO_SSH_PORT="10022"
-                DODO_KEEP_OLD_SSH_PORT="0"
-                DODO_ENABLE_FAIL2BAN="1"
-                DODO_CONFIGURE_PVE_FIREWALL="0"
-                DODO_UPGRADE_DEBIAN13="0"
-                DODO_ENABLE_ABUSE_REPORTS="0"
                 DODO_DISABLE_TCP_FORWARDING="1"
                 break
                 ;;
-            3)
+            2)
                 if [ "$PLATFORM" != "proxmox" ]; then
                     if [ "$DODO_LANG" = "zh" ]; then
                         tty_print "此选项只适用于 Proxmox VE。"
@@ -919,6 +1069,7 @@ EOF
                     fi
                     continue
                 fi
+                confirm_pve_firewall_profile || continue
                 DODO_INSTALL_KEYS="0"
                 DODO_DISABLE_PASSWORD_LOGIN="0"
                 DODO_CHANGE_SSH_PORT="0"
@@ -930,7 +1081,7 @@ EOF
                 DODO_DISABLE_TCP_FORWARDING="0"
                 break
                 ;;
-            4)
+            3)
                 select_debian13_mirror
                 DODO_INSTALL_KEYS="0"
                 DODO_DISABLE_PASSWORD_LOGIN="0"
@@ -943,9 +1094,9 @@ EOF
                 DODO_DISABLE_TCP_FORWARDING="0"
                 break
                 ;;
-            5)
+            4)
                 DODO_INSTALL_KEYS="1"
-                DODO_DISABLE_PASSWORD_LOGIN="0"
+                DODO_DISABLE_PASSWORD_LOGIN="1"
                 DODO_CHANGE_SSH_PORT="1"
                 DODO_SSH_PORT="10022"
                 DODO_KEEP_OLD_SSH_PORT="0"
@@ -956,18 +1107,18 @@ EOF
                 DODO_DISABLE_TCP_FORWARDING="0"
                 break
                 ;;
-            6)
+            5)
                 DODO_INSTALL_KEYS="1"
                 DODO_CONFIGURE_PVE_FIREWALL="0"
                 DODO_UPGRADE_DEBIAN13="0"
                 custom_menu
                 break
                 ;;
-            7)
+            6)
                 die "Canceled by user."
                 ;;
             *)
-                tty_print "Please select 1-7."
+                tty_print "Please select 1-6."
                 ;;
         esac
     done

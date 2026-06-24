@@ -2,7 +2,7 @@
 
 Interactive SSH key import and SSH hardening script for DODO K.K.
 
-The setup screen uses the Debian-style `whiptail`/`dialog` interface when available, and falls back to a plain text menu on minimal systems. The terminal UI uses ASCII labels for Debian 11/older locale compatibility.
+The setup screen uses the Debian-style `whiptail`/`dialog` interface when available, and falls back to a plain text menu on minimal systems. Chinese/Japanese UI requires a UTF-8 locale; otherwise the script falls back to English UI.
 
 ## English
 
@@ -33,18 +33,17 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 
 ### Menu Profiles
 
-- Recommended: import keys, change SSH port to `10022`, disable SSH password login, enable fail2ban.
-- Strict: recommended profile plus disable SSH TCP forwarding. Do not use this if you need SSH tunnels or port forwarding.
+- Recommended: import keys, change SSH port to `10022`, disable SSH password login, enable fail2ban, and disable SSH tunnels/port forwarding.
 - Proxmox firewall: configure only Proxmox firewall settings. It does not import keys or change SSH settings.
 - Debian 13 upgrade: enter this profile, then choose Global CDN or CN Aliyun APT sources.
-- Keys + port: import `authorized_keys` and change SSH to TCP `10022`.
+- Key only and Port Change: import `authorized_keys`, change SSH to TCP `10022`, and disable SSH password login.
 - Custom: choose each option manually.
 
 ### Features
 
 - Imports DODO `authorized_keys`.
 - Uses a `whiptail`/`dialog` terminal UI when available.
-- Uses ASCII labels in the terminal UI to avoid mojibake on non-UTF-8 consoles.
+- Uses Chinese/Japanese terminal UI when UTF-8 is available, with English fallback on non-UTF-8 consoles.
 - Backs up existing SSH key/config files before changes.
 - Detects Linux, Proxmox VE, and OpenWrt.
 - Supports OpenSSH and OpenWrt Dropbear.
@@ -56,6 +55,7 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 - On Proxmox VE, configures node firewall options for PVE 8/9 without adding node-level rules.
 - Disables password login for Linux/Proxmox/OpenWrt when selected.
 - Adds OpenSSH hardening options.
+- Recommended profile writes `AllowTcpForwarding no`; do not use it if the server must provide SSH tunnels, SOCKS proxy, or port forwarding.
 - Configures fail2ban SSH brute-force protection with nftables bans on supported Linux systems.
 - Optional fail2ban abuse reporting with RIR WHOIS abuse contact lookup.
 - Optional additional Spamhaus-compatible report destination.
@@ -149,18 +149,17 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 
 ### 設定方案
 
-- 推奨: SSH 鍵導入、SSH ポートを `10022` に変更、パスワードログイン無効化、fail2ban 有効化。
-- 厳格: 推奨設定に加えて SSH TCP forwarding を無効化。SSH tunnel や port forwarding を使う場合は選択しないでください。
+- 推奨: SSH 鍵導入、SSH ポートを `10022` に変更、パスワードログイン無効化、fail2ban 有効化、SSH tunnel/port forwarding 無効化。
 - Proxmox firewall: Proxmox firewall のみ設定。SSH 鍵導入や SSH 設定変更は行いません。
 - Debian 13 upgrade: この項目に入った後、Global CDN または CN Aliyun APT source を選択。
-- Keys + port: `authorized_keys` を導入し、SSH を TCP `10022` に変更。
+- Key only and Port Change: `authorized_keys` を導入し、SSH を TCP `10022` に変更し、password login を無効化。
 - カスタム: 各項目を手動で選択。
 
 ### 機能
 
 - DODO の `authorized_keys` を導入。
 - 利用可能な場合は `whiptail`/`dialog` のターミナル UI を使用。
-- 非 UTF-8 console の文字化けを避けるため、terminal UI は ASCII label を使用。
+- UTF-8 が利用可能な場合は日本語/中国語 terminal UI を使用し、非 UTF-8 console では英語 UI に fallback。
 - 変更前に既存の SSH 鍵/設定ファイルをバックアップ。
 - Linux、Proxmox VE、OpenWrt を自動検出。
 - OpenSSH と OpenWrt Dropbear に対応。
@@ -172,6 +171,7 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 - Proxmox VE では PVE 8/9 向けのノード firewall Options のみ設定し、ノード rules は追加しません。
 - 選択時に Linux/Proxmox/OpenWrt のパスワードログインを無効化。
 - OpenSSH の基本的なセキュリティ強化設定を追加。
+- 推奨設定では `AllowTcpForwarding no` を設定。SSH tunnel、SOCKS proxy、port forwarding が必要な server では使用しないでください。
 - 対応 Linux で nftables ban action を使う fail2ban SSH ブルートフォース対策を設定。
 - 任意で RIR WHOIS から abuse 連絡先を検索し、fail2ban ban 時に自動通報。
 - 任意で Spamhaus 互換の追加通報先を設定可能。
@@ -244,21 +244,21 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 
 ### 配置方案
 
-- 推荐：导入 SSH key、把 SSH 改为 `10022`、关闭密码登录、启用 fail2ban。
-- 严格：推荐配置加关闭 SSH TCP forwarding。使用 SSH 隧道或端口转发时不要选择。
+- 推荐：导入 SSH key、把 SSH 改为 `10022`、关闭密码登录、启用 fail2ban、关闭 SSH 隧道/端口转发。
 - Proxmox firewall：只配置 Proxmox 防火墙，不导入 key，不修改 SSH。
 - Debian 13 upgrade：进入后选择 Global CDN 或 CN Aliyun APT 源。
-- Keys + port：导入 `authorized_keys`，并把 SSH 改为 TCP `10022`。
+- Key only and Port Change：导入 `authorized_keys`，把 SSH 改为 TCP `10022`，并关闭密码登录。
 - 自定义：手动选择每个项目。
 
 ### 功能
 
 - 导入 DODO `authorized_keys`。
 - 使用 `whiptail`/`dialog` 界面，最小系统会回退到文本菜单。
-- 终端 UI 使用 ASCII 标签，避免 Debian 11 等非 UTF-8 控制台乱码。
+- UTF-8 可用时显示中文/日文终端 UI；Debian 11 等非 UTF-8 控制台会自动回退英文 UI。
 - 修改前备份 SSH key 和配置文件。
 - 自动检测 Linux、Proxmox VE、OpenWrt。
 - 支持 OpenSSH 和 OpenWrt Dropbear。
+- 推荐配置会写入 `AllowTcpForwarding no`；如果服务器需要 SSH 隧道、SOCKS 代理或端口转发，不要使用推荐配置，改用自定义。
 - 识别 nftables、UFW、firewalld、iptables、ip6tables、Proxmox firewall。
 - 支持为 TCP `10022` 添加本机防火墙放行规则。
 - Debian 11/12 推荐配置会检查 nftables；没有 nftables 时会显示当前防火墙并推荐先升级 Debian 13。
