@@ -2,7 +2,7 @@
 
 Interactive SSH key import and SSH hardening script for DODO K.K.
 
-The setup screen uses the Debian-style `whiptail`/`dialog` interface when available, and falls back to a plain text menu on minimal systems.
+The setup screen uses the Debian-style `whiptail`/`dialog` interface when available, and falls back to a plain text menu on minimal systems. The terminal UI uses ASCII labels for Debian 11/older locale compatibility.
 
 ## English
 
@@ -44,6 +44,7 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 
 - Imports DODO `authorized_keys`.
 - Uses a `whiptail`/`dialog` terminal UI when available.
+- Uses ASCII labels in the terminal UI to avoid mojibake on non-UTF-8 consoles.
 - Backs up existing SSH key/config files before changes.
 - Detects Linux, Proxmox VE, and OpenWrt.
 - Supports OpenSSH and OpenWrt Dropbear.
@@ -159,6 +160,7 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 
 - DODO の `authorized_keys` を導入。
 - 利用可能な場合は `whiptail`/`dialog` のターミナル UI を使用。
+- 非 UTF-8 console の文字化けを避けるため、terminal UI は ASCII label を使用。
 - 変更前に既存の SSH 鍵/設定ファイルをバックアップ。
 - Linux、Proxmox VE、OpenWrt を自動検出。
 - OpenSSH と OpenWrt Dropbear に対応。
@@ -253,6 +255,7 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 
 - 导入 DODO `authorized_keys`。
 - 使用 `whiptail`/`dialog` 界面，最小系统会回退到文本菜单。
+- 终端 UI 使用 ASCII 标签，避免 Debian 11 等非 UTF-8 控制台乱码。
 - 修改前备份 SSH key 和配置文件。
 - 自动检测 Linux、Proxmox VE、OpenWrt。
 - 支持 OpenSSH 和 OpenWrt Dropbear。
