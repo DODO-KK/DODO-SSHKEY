@@ -1516,36 +1516,41 @@ open_firewall_for_ssh_port() {
     [ "$DODO_CHANGE_SSH_PORT" = "1" ] || return 0
 
     port="$DODO_SSH_PORT"
+    firewall_updated="0"
     log "Opening TCP $port in local firewall where supported..."
     log "Detected firewall tools: $(firewall_summary | tr '\n' '; ')"
 
+    if have_cmd nft && nft list table inet dodo-sshkey >/dev/null 2>&1; then
+        nft delete table inet dodo-sshkey 2>/dev/null && \
+            log "Removed legacy DODO-SSHKEY nftables allow table; fail2ban should keep priority for bans."
+    fi
+
     if have_cmd ufw && ufw status 2>/dev/null | grep -qi active; then
         ufw allow "$port/tcp" || warn "Failed to update ufw for TCP $port."
+        firewall_updated="1"
     fi
 
     if have_cmd firewall-cmd && firewall-cmd --state >/dev/null 2>&1; then
         firewall-cmd --permanent --add-port="$port/tcp" || warn "Failed to update firewalld permanent rule for TCP $port."
         firewall-cmd --reload || warn "Failed to reload firewalld."
+        firewall_updated="1"
     fi
 
     if have_cmd iptables; then
         iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null || \
             iptables -I INPUT 1 -p tcp --dport "$port" -j ACCEPT 2>/dev/null || \
             warn "Failed to add temporary iptables allow rule for TCP $port."
-    fi
-
-    if have_cmd nft; then
-        nft add table inet dodo-sshkey 2>/dev/null || true
-        nft 'add chain inet dodo-sshkey input { type filter hook input priority -10; policy accept; }' 2>/dev/null || true
-        if ! nft list chain inet dodo-sshkey input 2>/dev/null | grep -q "tcp dport $port accept"; then
-            nft add rule inet dodo-sshkey input tcp dport "$port" accept 2>/dev/null || \
-                warn "Failed to add nftables allow rule for TCP $port."
-        fi
+        firewall_updated="1"
     fi
 
     if have_cmd ip6tables; then
         ip6tables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null || \
             ip6tables -I INPUT 1 -p tcp --dport "$port" -j ACCEPT 2>/dev/null || true
+        firewall_updated="1"
+    fi
+
+    if [ "$firewall_updated" = "0" ] && have_cmd nft; then
+        warn "Native nftables detected, but no UFW/firewalld/iptables frontend was updated. Manually allow TCP $port in your nftables policy if the default policy is DROP."
     fi
 
     if have_cmd pve-firewall; then

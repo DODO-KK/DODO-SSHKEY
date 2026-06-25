@@ -49,7 +49,8 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 - Supports OpenSSH and OpenWrt Dropbear.
 - Changes SSH service port to `10022` when selected.
 - Detects common firewall tools including nftables, UFW, firewalld, iptables, ip6tables, and Proxmox firewall.
-- Tries to open TCP `10022` in local nftables/UFW/firewalld/iptables where supported.
+- Tries to open TCP `10022` through UFW/firewalld/iptables where supported.
+- Removes the legacy `table inet dodo-sshkey` broad accept table if present, so fail2ban nftables bans keep precedence.
 - On Debian 11/12 recommended profiles, warns when nftables is missing and recommends the Debian 13 upgrade path.
 - On Proxmox VE, configures datacenter firewall options and adds datacenter-level rules for TCP `10022`, Web, and TCP `8006`.
 - On Proxmox VE, configures node firewall options for PVE 8/9 without adding node-level rules.
@@ -165,7 +166,8 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 - OpenSSH と OpenWrt Dropbear に対応。
 - 選択時に SSH サービスポートを `10022` に変更。
 - nftables、UFW、firewalld、iptables、ip6tables、Proxmox firewall など一般的な firewall tool を検出。
-- 対応環境では nftables/UFW/firewalld/iptables に TCP `10022` の許可を追加。
+- 対応環境では UFW/firewalld/iptables 経由で TCP `10022` の許可を追加。
+- 旧版が作成した `table inet dodo-sshkey` の broad accept table がある場合は削除し、fail2ban の nftables ban を優先させます。
 - Debian 11/12 の推奨設定では、nftables がない場合に警告し、Debian 13 upgrade path を推奨。
 - Proxmox VE ではデータセンター firewall の Options を設定し、TCP `10022`、Web、TCP `8006` のデータセンター rules を追加。
 - Proxmox VE では PVE 8/9 向けのノード firewall Options のみ設定し、ノード rules は追加しません。
@@ -260,7 +262,8 @@ curl -fsSL https://raw.githubusercontent.com/DODO-KK/DODO-SSHKEY/refs/heads/main
 - 支持 OpenSSH 和 OpenWrt Dropbear。
 - 推荐配置会写入 `AllowTcpForwarding no`；如果服务器需要 SSH 隧道、SOCKS 代理或端口转发，不要使用推荐配置，改用自定义。
 - 识别 nftables、UFW、firewalld、iptables、ip6tables、Proxmox firewall。
-- 支持为 TCP `10022` 添加本机防火墙放行规则。
+- 通过 UFW/firewalld/iptables 支持为 TCP `10022` 添加本机防火墙放行规则。
+- 如果存在旧版创建的 `table inet dodo-sshkey` broad accept 表，会自动删除，避免影响 fail2ban 的 nftables 封禁。
 - Debian 11/12 推荐配置会检查 nftables；没有 nftables 时会显示当前防火墙并推荐先升级 Debian 13。
 - fail2ban 使用 nftables ban action。
 - 可选 abuse 自动通报和 Spamhaus 兼容额外收件人。
